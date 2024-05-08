@@ -9,7 +9,7 @@ import streamlit as st
 import shutil
 import os
 
-from utils import load_readme_file
+from utils import list_repo_files, load_readme_file
 
 ## prompt template
 prompt = ChatPromptTemplate.from_messages(
@@ -25,6 +25,7 @@ output_parser = StrOutputParser()
 chain = prompt|llm|output_parser
 
 ## streamlit
+st.set_page_config(page_title="Repo Exploration", layout="wide")
 st.title('Repo Exploration')
 repo_local_path=None
 with st.sidebar:
@@ -42,9 +43,17 @@ with st.sidebar:
     
 if repo_local_path:
     st.write(f'Repo: {repo_url}')
-    if st.toggle('Show README.md'):
-        st.markdown('# README File:')
-        st.write(load_readme_file(repo_local_path),)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.toggle('Show README.md'):
+            st.markdown('# README File:')
+            st.write(load_readme_file(repo_local_path),)
+    with col2:
+        if st.toggle('Show Repo Files'):
+            st.markdown('# Repo File Structure')
+            repo_files = list_repo_files(repo_local_path)
+            print(repo_files)
+            st.write('\n'.join([f"* {d['file_path']}: {d['file_size']} Bytes" for d in repo_files]))
 
 if repo_url:
     input_text = st.text_input("Please enter query")
