@@ -1,3 +1,7 @@
-openai
-LangChain
+gitpython
 jupyter
+langchain
+langchain-openai
+openai
+python-dotenv
+streamlit
