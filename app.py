@@ -43,49 +43,33 @@ if repo_local_path:
     if st.button('Analayse Repo Files'):  
         repo_docs = load_repo_files(repo_local_path=repo_local_path)
         
-        system_prompt = st.text_input('System Prompt',"""
+        system_prompt = """
         You are an code securtiy analyst, adept at finding leaks of confidential information with code bases.
-        
-        The user will provide a file to you. Your role is to identify leaks of confidential information identify passwords, api_keys, or PII customer information like DOBs, addresses, and names.
-                                      
-        Please keep your answers clear, concise and strive to answer the users questions exactly. 
-                                      
-        Here is an example of the input and the output:
-                                      
-        INPUT:
-        
-        File Name: utils.py
-                                      
-        File Content:
-        
-        def fn(x):
-            # squares a number
-            # use the api_key 1234ajfalklk to access
-            # the function is written in python
-            return x**2
-        
-        OUTPUT:
-        
-        {
-            file_name: utils.py,
-            leaks_found:True,
-            leaks=['api key found : 1234ajfalklk]                              
-        }
-        
-        """)                         
 
-        user_prompt = st.text_input('Prompt',"""
-        File Name: {file_name}\n\nFile Content:\n\n{file_content}
-        """)
+        The user will provide a file to you. Your role is to identify leaks of confidential information including:
+        * api keys and app service keys e.g. 'api_key=AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe'
+        * PII customer information like DOBs, addresses, and names.
 
+        Do not provide extraneous information, general guidance or chain of reasoning. 
+        
+        If the file contains no links, simply state: 'no leaks found'. 
+        
+        If the file contains links, state the name of the file and then list the links one by one.
+        """
+                                
+        user_prompt = """
+        INPUT: \n\nFile Name: {file_name} \n\nFile Content: \n\n{file_content} \n\nOUTPUT:
+        """
 
         chain = get_chain(system_prompt=system_prompt, user_prompt=user_prompt, model=model)
 
         for doc in repo_docs:
             file_name = doc.metadata['source']
-            invoke_args = {'file_name':file_name, 'file_content':doc.page_content}
-            st.write(f'**{file_name}**:\n\n{chain.invoke(invoke_args)}')
-
+            file_content = doc.page_content
+            if len(file_content) == 0:
+                file_content='empty file.'
+            invoke_args = {'file_name':file_name, 'file_content':file_content}
+            st.write(f'{file_name}\n\n'+chain.invoke(invoke_args))
 
     readme_file_string = load_readme_file(repo_local_path)
 

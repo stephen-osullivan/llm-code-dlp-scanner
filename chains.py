@@ -19,7 +19,7 @@ def get_chain(model = 'llama3', system_prompt = default_system_prompt, user_prom
 )
     llm = ollama.Ollama(
         model=model, 
-        stop=['<|eot_id|>'], num_ctx = 2048, temperature=0.2)
+        stop=['<|eot_id|>'], num_ctx = 2048, temperature=0)
     output_parser = StrOutputParser()
     chain = prompt|llm|output_parser
     return chain
