@@ -2,66 +2,88 @@
 remember to first run $ ollama serve
 """
 from git import Repo
-from langchain_community.llms import ollama
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 import streamlit as st
-import shutil
+
 import os
+import shutil
 
+from chains import get_chain
 from utils import list_repo, load_readme_file, load_repo_files
-
-## prompt template
-
-system_prompt = """
-    You are a useful AI assitant, who is an expert at reviewing code repositories. 
-    Please keep your answers consise and strive to answer the users questions exactly."""
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ('system', system_prompt),
-        ("human", "{question}"),
-    ]
-)
-
-## model
-llm = ollama.Ollama(model='llama3', stop=['<|eot_id|>'], num_ctx = 2048, temperature=0.2)
-output_parser = StrOutputParser()
-chain = prompt|llm|output_parser
 
 ## streamlit
 st.set_page_config(page_title="Repo Exploration", layout="wide")
 st.title('Repo Exploration')
 repo_local_path = None
 with st.sidebar:
+    model = st.selectbox('Model', ['llama3', 'llama2'])
     repo_type = st.selectbox('Repo Type', ['Local', 'Online'])
+    
     if repo_type == 'Online':
-        repo_url = st.text_input('Please enter a github repo url: https://github.com/user/repo.git')
+        repo_url = st.text_input(
+            'Please enter a github repo url: https://github.com/user/repo.git')
         st.write(f'Repo: {repo_url}')
+        
         if repo_url:
             download_repo = st.button('Download Repo')
             repo_local_path = os.path.join('repos', '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
+            
             if download_repo:
                 # Clone the repository
                 if os.path.exists(repo_local_path):
                     # Remove the existing directory and its contents
                     shutil.rmtree(repo_local_path)
-                repo = Repo.clone_from(repo_url, repo_local_path)
+                repo = Repo.clone_from(repo_url,
+                                        repo_local_path)
+    
     elif repo_type == 'Local':
         repo_local_path = st.text_input('Enter Repo Directory')
         st.write(f'Repo: {repo_local_path}')
 
 if repo_local_path:
-    if st.button('Load Repo Files'):  
+    if st.button('Analayse Repo Files'):  
         repo_docs = load_repo_files(repo_local_path=repo_local_path)
-        prompt = """
-        Please look for confidential information leaks in the below file. I'd like you to identify passwords, api_keys, or PII customer information like DOBs, addresses, and names. 
-        Please only mention leaks that have you have actually discovered and do not give general suggestions on how to avoid leaks.
-        Can you also summarise what the files are doing please in one sentence.
-        """
         
+        system_prompt = st.text_input('System Prompt',"""
+        You are an code securtiy analyst, adept at finding leaks of confidential information with code bases.
+        
+        The user will provide a file to you. Your role is to identify leaks of confidential information identify passwords, api_keys, or PII customer information like DOBs, addresses, and names.
+                                      
+        Please keep your answers clear, concise and strive to answer the users questions exactly. 
+                                      
+        Here is an example of the input and the output:
+                                      
+        INPUT:
+        
+        File Name: utils.py
+                                      
+        File Content:
+        
+        def fn(x):
+            # squares a number
+            # use the api_key 1234ajfalklk to access
+            # the function is written in python
+            return x**2
+        
+        OUTPUT:
+        
+        {
+            file_name: utils.py,
+            leaks_found:True,
+            leaks=['api key found : 1234ajfalklk]                              
+        }
+        
+        """)                         
+
+        user_prompt = st.text_input('Prompt',"""
+        File Name: {file_name}\n\nFile Content:\n\n{file_content}
+        """)
+
+
+        chain = get_chain(system_prompt=system_prompt, user_prompt=user_prompt, model=model)
+
         for doc in repo_docs:
             file_name = doc.metadata['source']
-            invoke_args = {'question': prompt + '\n\n' + '#'*20 + '\n' + file_name + '#'*20 +'\n\n'+ doc.page_content}
+            invoke_args = {'file_name':file_name, 'file_content':doc.page_content}
             st.write(f'**{file_name}**:\n\n{chain.invoke(invoke_args)}')
 
 
