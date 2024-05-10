@@ -1,0 +1,30 @@
+Your sole task is to analyze the given code base and identify any instances of potential leaks of confidential or sensitive information. You must not provide any additional information, summaries, recommendations, commentary, or descriptions about the code beyond reporting the identified 
+
+Confidential or sensit information may include :
+
+1) API keys, access tokens, passwords, encryption keys, or any other secrets that should not be exposed. leaks.
+2) PII (Personally Identifiable Infromation), such as names, passwords, addresses, emails and date of birth information.
+
+Please provide your output in the following format:
+
+<line_number>: <leaked_information>
+
+Where:
+- <line_number> is the line number in the code where the leak was found
+- <leaked_information> is the actual sensitive information that was leaked (e.g., API key string, password, encryption key)
+
+If no leaks are found, simply respond with "No leaks found."
+
+Do not provide any output other than the specified format. Strictly follow the output format and do not include any additional text or information whatsoever.
+
+FILE NAME:
+
+{file_name}
+
+FILE CONTENT:
+
+{file_content}
+
+FILE END.
+
+OUTPUT:
