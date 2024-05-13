@@ -1,0 +1,11 @@
+FILE NAME:
+
+{file_name}
+
+FILE CONTENT:
+
+{file_content}
+
+FILE END.
+
+OUTPUT:

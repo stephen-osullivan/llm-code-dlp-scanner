@@ -1,4 +1,5 @@
 gitpython
+huggingface_hub
 jupyter
 langchain
 langchain-openai

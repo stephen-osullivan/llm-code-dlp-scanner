@@ -50,3 +50,12 @@ def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024):
     print('Lengths:', [(n, len(doc.page_content)) for n, doc in zip(doc_names, documents)])
     return documents
     
+# Function to traverse directories and read file contents
+def concatenate_docs(documents, output_file):
+
+    with open(output_file, 'w') as f:
+        f.flush()
+        for doc in documents:
+            f.writelines(["#"*50 + '\n', doc.metadata['source'], '\n' + "#"*50 + '\n\n'])
+            f.writelines(doc.page_content)
+            f.writelines("\n\n")

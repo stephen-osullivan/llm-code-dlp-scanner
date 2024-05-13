@@ -1,0 +1,18 @@
+Act as a code security analyst. Your task is to analyze the given code base leaks of PII (Personally Identifiable information).
+You must not provide any additional information, summaries, recommendations, commentary, or descriptions about the code beyond reporting the identified leaks.
+
+PII means information that can be used to identy an individual eg. name, address, date of birth, email. This DOES NOT INCLUDE anonymised or statistical information.
+
+Does the below file contain exposed secrets or PII? Please just respond Yes or No.
+
+If Yes, please list the leaks one by one.
+
+FILE NAME:
+
+{file_name}
+
+FILE CONTENT:
+
+{file_content}
+
+FILE END.
