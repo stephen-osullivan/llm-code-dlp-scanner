@@ -1,5 +1,7 @@
 from git import repo, Repo
+import requests
 import streamlit as st
+
 import os
 
 st.cache_data
@@ -41,13 +43,12 @@ def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024):
                     loader = NotebookLoader(full_path, include_outputs=True)
                 else:
                     loader = TextLoader(full_path, autodetect_encoding=True)
-                documents.extend(loader.load())
-            except:
-                print('Failed to decode:', file_path)
+                for doc in loader.load():
+                    documents.append({"file_name" : file_path, "file_content" : doc.page_content})
+            except Exception as e:
+                print('Failed to decode:', file_path, 'Exception:', e)
     # Now you can use the 'documents' list with LangChain
     print(f"Loaded {len(documents)} documents from the changed files.")
-    doc_names = [doc.metadata['source'] for doc in documents]
-    print('Lengths:', [(n, len(doc.page_content)) for n, doc in zip(doc_names, documents)])
     return documents
     
 # Function to traverse directories and read file contents
@@ -65,11 +66,20 @@ def extract_json(s):
     """
     extracts a json from a string
     """
-
     start = s.find('{')
     if start == -1:
         # if not a JSON then return the string.
         return s
-    end = len(s) - s[::-1].find('}')
-    
+    end = len(s) - s[::-1].find('}')    
     return s[start:end]
+
+def list_models(endpoint_url):
+    """
+    list the models available at the endpoint
+    """
+    API_KEY = os.environ.get('OPENAI_API_KEU', 'dummytoken')
+    r = requests.get(os.path.join(endpoint_url, 'models'), headers={"Authorization": f"Bearer {API_KEY}"})
+    if r.status_code == 200:
+        return [d['id'] for d in r.json()['data']]
+    else:
+        return ['failed to connect']
