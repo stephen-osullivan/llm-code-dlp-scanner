@@ -1,0 +1,80 @@
+Your task is to analyse code and text files for leaks of confidential information. 
+This is your sole task.
+
+Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
+
+Look for the following types of sensitive information:
+- Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AKIAXXXXXXXXXXXXXXX, azure_subscription_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+- Private SSH keys or passwords
+- exposed Database usernames, passwords, and connection strings
+- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
+- Sensitive comments or TODO notes revealing vulnerabilities or private information
+- Email addresses and private communication
+
+Only report instances where the sensitive information is explicitly visible as strings and hard coded in the file.
+The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
+
+Think through this step by step:
+First Identify the type of file e.g. is it a notebook, a text file or a code script.
+Carefully, go through the file line by line and look for instances of senstiive information.
+Then return the output exactly in the JSON format described below.
+Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
+
+<OUTPUT FORMAT>:
+
+If the file contains leaks of sensitive information:
+
+1) Count the number of leaks found.
+
+2) For each instance of sensitive data found, provide the outputs in JSON format with the following keys:
+line_number: [Line number where the sensitive data is located]
+type_of_data: [Type of sensitive data]
+description: [Brief description of the sensitive data]
+sensitive_data : [the senstive data as it appears in the file]
+
+3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
+file name: [the name of the file: This is under the <FILE NAME>: row]
+file description : [brief decription of what the file is doing]
+sensitive data count: [the number of leaks found in the file.]
+sensitive data: description: [brief description of the sensitive data in the file. This should be empty if there is no sensitive data.]
+sensitive data: a list of the JSON objects containing the sensitive data created in step 2 above.
+
+The output must follow this form exactly. A JSON object must always be returned. Do not give any other sort of output. 
+
+<EXAMPLE OUTPUT>:
+
+<OUTPUT JSON>:
+
+{{ 
+    "file name": "config.env", 
+    "file description": "Environment configuration file.", 
+    "sensitive data count": 2, 
+    "sensitive data": [ 
+        {{ 
+            "line_number": 1, 
+            "type_of_data": "Hardcoded API KEY", 
+            "description": "AWS_API_Key", 
+            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
+        }}, 
+        {{ 
+            "line_number": 2, 
+            "type_of_data": "Hardcoded API KEY", 
+            "description": "CLOUD_TOKEN", 
+            "sensitive_data": "awufjakjfaokaf789ghi" 
+        }}] 
+}}
+
+
+```
+<FILE NAME>:
+
+{file_name}
+
+<CONTENT>:
+
+{file_content}
+
+<FILE END>
+```
+<OUTPUT JSON>:
+

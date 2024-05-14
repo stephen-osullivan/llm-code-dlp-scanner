@@ -59,3 +59,17 @@ def concatenate_docs(documents, output_file):
             f.writelines(["#"*50 + '\n', doc.metadata['source'], '\n' + "#"*50 + '\n\n'])
             f.writelines(doc.page_content)
             f.writelines("\n\n")
+
+
+def extract_json(s):
+    """
+    extracts a json from a string
+    """
+
+    start = s.find('{')
+    if start == -1:
+        # if not a JSON then return the string.
+        return s
+    end = len(s) - s[::-1].find('}')
+    
+    return s[start:end]

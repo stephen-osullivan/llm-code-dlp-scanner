@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 from langchain_community.llms import ollama, HuggingFaceEndpoint
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 
 import os
@@ -48,7 +48,8 @@ def get_hugginface_model(model="mistralai/Mistral-7B-Instruct-v0.2"):
     return llm
 
 def get_prompt_template(prompt):
-    prompt_template = PromptTemplate.from_template(prompt)
-
+    prompt_template = ChatPromptTemplate.from_messages(
+        ('human', prompt),
+    )
     return prompt_template
 

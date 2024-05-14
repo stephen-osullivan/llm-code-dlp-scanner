@@ -4,11 +4,12 @@ remember to first run $ ollama serve
 from git import Repo
 import streamlit as st
 
+import json
 import os
 import shutil
 
 from chains import get_chain
-from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs
+from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json
 
 ## streamlit
 st.set_page_config(page_title="Repo Exploration", layout="wide")
@@ -56,14 +57,13 @@ if repo_local_path:
             chain = get_chain(framework=framework, model=model, prompt=prompt)
         
             for doc in repo_docs:
-                file_name = doc.metadata['source']
-                file_content = doc.page_content
+                file_name, file_content = doc.metadata['source'], doc.page_content
                 if len(file_content) == 0:
-                    file_content='empty file.'
-                
-                invoke_args = {'file_name':file_name, 'file_content':file_content}
+                    file_content = 'EMPTY FILE.'        
+                invoke_args = {'file_name': file_name, 'file_content': file_content}
                 with st.chat_message("AI"):
-                    st.write(f'{file_name}\n\n' + chain.invoke(invoke_args))
+                    st.write(f"{file_name}:\n\n`{extract_json(chain.invoke(invoke_args))}`")
+
         elif file_method == 'Concatenated':
             repo_docs = load_repo_files(repo_local_path=repo_local_path)
             concatenate_docs(repo_docs, 'temp.txt')
