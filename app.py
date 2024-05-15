@@ -2,6 +2,7 @@ from git import Repo
 import streamlit as st
 
 import concurrent.futures
+from io import StringIO
 import json
 import os
 import shutil
@@ -10,11 +11,11 @@ from chains import get_chain
 from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models
 
 st.set_page_config(page_title="Repo Security Analysis", layout="wide")
-st.title('Repo Security_Analysis')
+st.title('Repo Security Analysis 🪬')
+
 repo_local_path = None
 
 ########################### APP FUNCTIONS #######################################
-
 def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
     """
     use multithreading to submitted files for analysis concurrently.
@@ -27,7 +28,7 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             file_name = invoke_args['file_name']
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
-            return f"{file_name}:\n\n`{extract_json(chain.invoke(invoke_args))}`"
+            return invoke_args['file_name'], extract_json(chain.invoke(invoke_args))
 
         threads = []
         for invoke_args in invoke_args_list:
@@ -36,8 +37,12 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
         # print results as and when they come in
         for future in concurrent.futures.as_completed(threads):
             with st.chat_message('AI'):
-                st.write(future.result())
-
+                file_name, response = future.result()
+                st.write(file_name)
+                if response[0] == '{':
+                    st.json(response)
+                else:
+                    st.write(response)
 
 def select_model():
     """
@@ -66,9 +71,9 @@ def get_repo():
     if repo_type == 'Online':
         repo_url = st.text_input(
             'Please enter a github repo url: https://github.com/user/repo.git')
-        st.write(f'Repo: {repo_url}')
         
         if repo_url:
+            st.write(f'**Repo:** {repo_url}')
             download_repo = st.button('Download Repo')
             repo_local_path = os.path.join('../temp/repos', '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
             
@@ -78,13 +83,16 @@ def get_repo():
                     # Remove the existing directory and its contents
                     shutil.rmtree(repo_local_path)
                 repo = Repo.clone_from(repo_url, repo_local_path)
+                st.write('Download Successful.')
     
     elif repo_type == 'Local':
-        repo_local_path = st.text_input('Enter Repo Directory e.g. ../temp/repos/user-name/repo-name')
-        st.write(f'Repo: {repo_local_path}')
+        repo_local_path = st.text_input('Enter Repo Path')
+        if repo_local_path:
+            st.write(f'**Repo**: {repo_local_path}')
     
     return repo_local_path
 
+@st.cache_data
 def show_repo_files(repo_local_path):
     """
     list the files in repo
@@ -97,31 +105,84 @@ def show_repo_files(repo_local_path):
     out_string = out_string + '\n\n**Repo Dirs:**\n\n' + '\n'.join([d['file_path'] for d in repo_dirs])
     st.write(out_string)
 
+def get_current_prompt() -> str:
+    with open('prompts/prompt-current.txt', 'r') as f:
+        prompt = f.read()
+    return prompt
+
 ########################### STREAMLIT APP #######################################
 
 ### SIDE BAR
 with st.sidebar:
     # side bar options
+    st.write('**Select Model:**')
     framework, model = select_model()
+    st.write('#')
+    st.write('**Select Repo:**')
     repo_local_path =  get_repo()
-    
-### MAIN PAGE
-if repo_local_path:
-    if st.button('Analyse Repo Files'):  
-        # analyse the files in the repo for PII leaks.
-        repo_docs = load_repo_files(repo_local_path=repo_local_path) 
-        print(repo_docs)
-        with open('prompts/prompt-current.txt', 'r') as f:
-            prompt = f.read()                           
-        chain = get_chain(framework=framework, model=model, prompt=prompt)
-        get_multi_threaded_response(chain=chain, docs=repo_docs)
 
-    col1, col2 = st.columns([2,1])
+### Main section
+if repo_local_path and os.path.isdir(repo_local_path):
+    # Display Repo Metrics in header
+    files = list_repo(repo_local_path, depth=-1, files_only=True)
+    num_files = len(files)
+    size = sum(d['file_size'] for d in files)
+    if size < (1024*1024):
+        size =  f'{size/(1024*1024):.2f}MB'
+    else:
+        size =  f'{size/(1024*1024*1024):.2f}GB'
+
+    col1, col2 = st.columns((1,2))
+    col1.metric('Files in Repo', num_files)
+    col2.metric('Repo Size', size)
+
+
+tab1, tab2, tab3 = st.tabs(['View Repo', 'Scan Repo', 'Change Prompt'])
+with tab1:
+    # View Repo Readme or Files
+    if repo_local_path:
+        col1, col2 = st.columns([2,1])
+        with col1:
+            if st.toggle('Show README.md'):
+                readme_file_string = load_readme_file(repo_local_path)
+                st.markdown(readme_file_string, unsafe_allow_html=True)
+
+        with col2:
+            if st.toggle('Show Repo Files'):
+                show_repo_files(repo_local_path=repo_local_path)
+    else:
+        st.write('**Use sidebar to select a repo**')
+
+with tab2:
+    # Analyse Repo files with LLM
+    if repo_local_path:
+        if st.button('Analyse Repo Files'):  
+            # analyse the files in the repo for PII leaks.
+            repo_docs = load_repo_files(repo_local_path=repo_local_path) 
+            prompt = get_current_prompt()                        
+            chain = get_chain(framework=framework, model=model, prompt=prompt)
+            get_multi_threaded_response(chain=chain, docs=repo_docs)
+    else:
+        st.write('**Use sidebar to select a repo**')
+
+with tab3:
+    ### Options to view and change Prompt
+    col1, col2 = st.columns((1,1))
+    
     with col1:
-        if st.toggle('Show README.md'):
-            readme_file_string = load_readme_file(repo_local_path)
-            st.markdown(readme_file_string, unsafe_allow_html=True)
+        if st.button('Reset Prompt to Default'):
+            shutil.copyfile('prompts/prompt-default.txt', 'prompts/prompt-current.txt')
+        st.write('**Current Prompt**')
+        current_prompt_textbox = st.text(get_current_prompt())
 
     with col2:
-        if st.toggle('Show Repo Files'):
-            show_repo_files(repo_local_path=repo_local_path)
+        change_prompt_button = st.button('Change Prompt')
+        new_prompt = st.text_area('**Input New Prompt**', height = 600)
+        if change_prompt_button and new_prompt != "":
+            with open('prompts/prompt-current.txt', 'w') as f:
+                f.write(new_prompt)
+            current_prompt_textbox.text(get_current_prompt())
+        st.write('**Prompt must have arguments {file_name} and {file_content} and should return a JSON**')
+        
+   
+    
