@@ -78,7 +78,7 @@ def list_models(endpoint_url):
     """
     list the models available at the endpoint
     """
-    API_KEY = os.environ.get('OPENAI_API_KEU', 'dummytoken')
+    API_KEY = os.environ.get('OPENAI_API_KEY', 'dummytoken')
     
     try:
         r = requests.get(os.path.join(endpoint_url, 'models'), headers={"Authorization": f"Bearer {API_KEY}"})

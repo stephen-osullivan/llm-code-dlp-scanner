@@ -39,9 +39,10 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             with st.chat_message('AI'):
                 file_name, response = future.result()
                 st.write(file_name)
-                if response[0] == '{':
+                try:
+                    response = json.loads(response)
                     st.json(response)
-                else:
+                except:
                     st.write(response)
 
 def select_model():
@@ -56,6 +57,7 @@ def select_model():
     elif framework == 'openai-compatible':
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
+        models = list
         model = st.selectbox('Model', list_models(endpoint_url))
     elif framework == 'huggingface':
         model = st.selectbox('Model', ["mistralai/Mistral-7B-Instruct-v0.2", "google/gemma-1.1-7b-it", "meta-llama/Meta-Llama-3-8B-Instruct"])
