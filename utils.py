@@ -13,6 +13,7 @@ def load_readme_file(directory):
         return readme_content
     else:
         return "No README file found in the specified directory."
+    
 st.cache_data
 def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
     commit = Repo(repo_local_path).commit(commit_hash)
@@ -78,8 +79,13 @@ def list_models(endpoint_url):
     list the models available at the endpoint
     """
     API_KEY = os.environ.get('OPENAI_API_KEU', 'dummytoken')
-    r = requests.get(os.path.join(endpoint_url, 'models'), headers={"Authorization": f"Bearer {API_KEY}"})
-    if r.status_code == 200:
-        return [d['id'] for d in r.json()['data']]
-    else:
-        return ['failed to connect']
+    
+    try:
+        r = requests.get(os.path.join(endpoint_url, 'models'), headers={"Authorization": f"Bearer {API_KEY}"})
+        if r.status_code == 200:
+            return [d['id'] for d in r.json()['data']]
+        else:
+            return [f'failed to connect. Status code: {r.status_code}']
+    except Exception as e:
+        print(e)
+        return ['Failed to connect to host.']

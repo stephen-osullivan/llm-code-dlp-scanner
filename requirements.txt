@@ -1,6 +1,5 @@
-gitpython
+gitpython==3.1.43
 huggingface_hub
-jupyter
 langchain
 langchain-openai
 openai
