@@ -29,7 +29,12 @@ def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
     return output_list
 
 st.cache_data
-def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024):
+def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*50): # 50MB
+    """
+    returns a list in the form: [
+        {"file_name" : file_path, "file_content" : doc.page_content, "file_length" : length in chars}
+    ]
+    """
     from langchain_community.document_loaders import TextLoader, NotebookLoader
 
     # Load the changed files into LangChain documents
@@ -45,7 +50,12 @@ def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024):
                 else:
                     loader = TextLoader(full_path, autodetect_encoding=True)
                 for doc in loader.load():
-                    documents.append({"file_name" : file_path, "file_content" : doc.page_content})
+                    documents.append(
+                        {
+                            "file_name" : file_path, 
+                            "file_content" : doc.page_content, 
+                            "file_length": len(doc.page_content)
+                        })
             except Exception as e:
                 print('Failed to decode:', file_path, 'Exception:', e)
     # Now you can use the 'documents' list with LangChain

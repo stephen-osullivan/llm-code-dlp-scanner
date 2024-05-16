@@ -16,7 +16,7 @@ The FILE CONTENT may contain multiple instances of senstive information, separat
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
-Carefully, go through the file line by line and look for instances of senstiive information.
+Carefully, go through the file line by line and look for instances of sensitiive information.
 Then return the output exactly in the JSON format described below.
 Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
 

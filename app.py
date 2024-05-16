@@ -10,6 +10,8 @@ import shutil
 from chains import get_chain
 from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models
 
+MAX_CHARS = 10_000
+
 st.set_page_config(page_title="Repo Security Analysis", layout="wide")
 st.title('Repo Security Analysis 🪬')
 
@@ -28,7 +30,9 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             file_name = invoke_args['file_name']
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
-            return invoke_args['file_name'], extract_json(chain.invoke(invoke_args))
+            #return invoke_args['file_name'], extract_json(chain.invoke(invoke_args))
+            return invoke_args['file_name'], chain.invoke(invoke_args)
+
 
         threads = []
         for invoke_args in invoke_args_list:
@@ -40,7 +44,7 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                 file_name, response = future.result()
                 st.write(file_name)
                 try:
-                    response = json.loads(response)
+                    #response = json.loads(response)
                     st.json(response)
                 except:
                     st.write(response)
@@ -49,7 +53,8 @@ def select_model():
     """
     select a frame work and thena  model from those available
     """
-    framework = st.selectbox('Framework', ['OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface']).lower()
+    endpoint_url=None
+    framework = st.selectbox('Framework', ['OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface', 'vLLM']).lower()
     if framework == 'ollama':
         model = st.selectbox('Model', ['llama3', 'llama2', 'deepseek-coder'])
     elif framework == 'openai':
@@ -57,11 +62,15 @@ def select_model():
     elif framework == 'openai-compatible':
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
-        models = list
         model = st.selectbox('Model', list_models(endpoint_url))
+    elif framework == "vllm":
+        default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
+        endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
+        model = st.text_input('Model', "TheBloke/Mistral-7B-Instruct-v0.2-AWQ")
+
     elif framework == 'huggingface':
         model = st.selectbox('Model', ["mistralai/Mistral-7B-Instruct-v0.2", "google/gemma-1.1-7b-it", "meta-llama/Meta-Llama-3-8B-Instruct"])
-    return framework, model
+    return framework, model, endpoint_url
 
 def get_repo():
     """
@@ -118,7 +127,7 @@ def get_current_prompt() -> str:
 with st.sidebar:
     # side bar options
     st.write('**Select Model:**')
-    framework, model = select_model()
+    framework, model, endpoint_url = select_model()
     st.write('#')
     st.write('**Select Repo:**')
     repo_local_path =  get_repo()
@@ -129,15 +138,14 @@ if repo_local_path and os.path.isdir(repo_local_path):
     files = list_repo(repo_local_path, depth=-1, files_only=True)
     num_files = len(files)
     size = sum(d['file_size'] for d in files)
-    if size < (1024*1024):
-        size =  f'{size/(1024*1024):.2f}MB'
+    if size < (1024*1024*1024):
+        size =  f'{size/(1024*1024):.2f} MB'
     else:
-        size =  f'{size/(1024*1024*1024):.2f}GB'
+        size =  f'{size/(1024*1024*1024):.2f} GB'
 
     col1, col2 = st.columns((1,2))
     col1.metric('Files in Repo', num_files)
     col2.metric('Repo Size', size)
-
 
 tab1, tab2, tab3 = st.tabs(['View Repo', 'Scan Repo', 'Change Prompt'])
 with tab1:
@@ -160,10 +168,23 @@ with tab2:
     if repo_local_path:
         if st.button('Analyse Repo Files'):  
             # analyse the files in the repo for PII leaks.
-            repo_docs = load_repo_files(repo_local_path=repo_local_path) 
+            docs = load_repo_files(repo_local_path=repo_local_path) 
+
+            # filter out docks too large to send to llm
+            docs_large = [doc for doc in docs if doc['file_length'] > MAX_CHARS]
+            
+            for doc in docs_large:
+                with st.chat_message('ai'):
+                    st.write(doc['file_name'])
+                    st.write(f"File too large to analyse: {doc['file_length']} chars.")
+
+            # send remaining docs to llm
+            docs_large_names = [doc['file_name'] for doc in docs_large]
+            docs = [doc for doc in docs if doc['file_name'] not in docs_large_names]
+            
             prompt = get_current_prompt()                        
-            chain = get_chain(framework=framework, model=model, prompt=prompt)
-            get_multi_threaded_response(chain=chain, docs=repo_docs)
+            chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url)
+            get_multi_threaded_response(chain=chain, docs=docs)
     else:
         st.write('**Use sidebar to select a repo**')
 
