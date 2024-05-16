@@ -10,11 +10,10 @@ import shutil
 from chains import get_chain
 from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models
 
-MAX_CHARS = 10_000
-
 st.set_page_config(page_title="Repo Security Analysis", layout="wide")
 st.title('Repo Security Analysis 🪬')
 
+REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 repo_local_path = None
 
 ########################### APP FUNCTIONS #######################################
@@ -24,25 +23,25 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:    
 
-        invoke_args_list = [{'file_content': doc['file_content'], 'file_name': doc['file_name']} for doc in docs]
-
-        def get_formatted_response(chain, invoke_args):
+        def get_formatted_response(chain, doc):
+            invoke_args = {k: doc[k] for k in ['file_name', 'file_content']}
             file_name = invoke_args['file_name']
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
             #return invoke_args['file_name'], extract_json(chain.invoke(invoke_args))
-            return invoke_args['file_name'], chain.invoke(invoke_args)
-
+            return doc, chain.invoke(invoke_args)
 
         threads = []
-        for invoke_args in invoke_args_list:
-            threads.append(executor.submit(get_formatted_response, chain, invoke_args))
+        for doc in docs:
+            threads.append(executor.submit(get_formatted_response, chain, doc))
 
         # print results as and when they come in
         for future in concurrent.futures.as_completed(threads):
             with st.chat_message('AI'):
-                file_name, response = future.result()
-                st.write(file_name)
+                doc, response = future.result()
+                st.write(doc['file_name'])
+                st.write(f"Chunk {doc['chunk_idx']+1} of {doc['total_chunks']}")
+                st.write()
                 try:
                     #response = json.loads(response)
                     st.json(response)
@@ -55,14 +54,18 @@ def select_model():
     """
     endpoint_url=None
     framework = st.selectbox('Framework', ['OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface', 'vLLM']).lower()
+    
     if framework == 'ollama':
         model = st.selectbox('Model', ['llama3', 'llama2', 'deepseek-coder'])
+    
     elif framework == 'openai':
         model = st.selectbox('Model', ['gpt-3.5-turbo'])
+    
     elif framework == 'openai-compatible':
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
         model = st.selectbox('Model', list_models(endpoint_url))
+    
     elif framework == "vllm":
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
@@ -70,6 +73,7 @@ def select_model():
 
     elif framework == 'huggingface':
         model = st.selectbox('Model', ["mistralai/Mistral-7B-Instruct-v0.2", "google/gemma-1.1-7b-it", "meta-llama/Meta-Llama-3-8B-Instruct"])
+    
     return framework, model, endpoint_url
 
 def get_repo():
@@ -86,7 +90,7 @@ def get_repo():
         if repo_url:
             st.write(f'**Repo:** {repo_url}')
             download_repo = st.button('Download Repo')
-            repo_local_path = os.path.join('../temp/repos', '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
+            repo_local_path = os.path.join(REPO_SAVE_DIR, '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
             
             if download_repo:
                 # Clone the repository
@@ -147,7 +151,7 @@ if repo_local_path and os.path.isdir(repo_local_path):
     col1.metric('Files in Repo', num_files)
     col2.metric('Repo Size', size)
 
-tab1, tab2, tab3 = st.tabs(['View Repo', 'Scan Repo', 'Change Prompt'])
+tab1, tab2, tab3, tab4 = st.tabs(['View Repo', 'Scan Repo', 'Change Prompt', 'Clear Cache'])
 with tab1:
     # View Repo Readme or Files
     if repo_local_path:
@@ -169,19 +173,6 @@ with tab2:
         if st.button('Analyse Repo Files'):  
             # analyse the files in the repo for PII leaks.
             docs = load_repo_files(repo_local_path=repo_local_path) 
-
-            # filter out docks too large to send to llm
-            docs_large = [doc for doc in docs if doc['file_length'] > MAX_CHARS]
-            
-            for doc in docs_large:
-                with st.chat_message('ai'):
-                    st.write(doc['file_name'])
-                    st.write(f"File too large to analyse: {doc['file_length']} chars.")
-
-            # send remaining docs to llm
-            docs_large_names = [doc['file_name'] for doc in docs_large]
-            docs = [doc for doc in docs if doc['file_name'] not in docs_large_names]
-            
             prompt = get_current_prompt()                        
             chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url)
             get_multi_threaded_response(chain=chain, docs=docs)
@@ -206,6 +197,17 @@ with tab3:
                 f.write(new_prompt)
             current_prompt_textbox.text(get_current_prompt())
         st.write('**Prompt must have arguments {file_name} and {file_content} and should return a JSON**')
-        
+    
+    with tab4:
+        st.write('**Repos Downloaded:**')
+        repos = []
+        users = os.listdir(REPO_SAVE_DIR)
+        for user in users:
+            user_repos = os.listdir(os.path.join(REPO_SAVE_DIR, user))
+            repos.extend([os.path.join(user, r) for r in user_repos])
+        st.write(repos)
+        if st.button('Clear Downloaded Repos'):
+            for r in repos:
+                shutil.rmtree(os.path.join(REPO_SAVE_DIR, r))
    
     
