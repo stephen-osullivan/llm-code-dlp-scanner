@@ -29,13 +29,17 @@ def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
     return output_list
 
 st.cache_data
-def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*50): # 50MB
+def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*50): # 10MB
     """
     returns a list in the form: [
         {"file_name" : file_path, "file_content" : doc.page_content, "file_length" : length in chars}
     ]
     """
     from langchain_community.document_loaders import TextLoader, NotebookLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=1)
 
     # Load the changed files into LangChain documents
     documents = []
@@ -43,13 +47,14 @@ def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*50): # 50MB
     for file_dict in file_dicts:
         file_path, file_size = file_dict['file_path'], file_dict['file_size']
         full_path = os.path.join(repo_local_path, file_path)
-        if (file_size < max_size): # less than 10kb 
+        if (file_size < max_size): # less than 10MB
             try:
                 if file_path.split('.')[-1] == 'ipynb':
                     loader = NotebookLoader(full_path, include_outputs=True)
                 else:
                     loader = TextLoader(full_path, autodetect_encoding=True)
-                for doc in loader.load():
+                docs = loader.load()
+                for doc in splitter.split_documents(docs):
                     documents.append(
                         {
                             "file_name" : file_path, 

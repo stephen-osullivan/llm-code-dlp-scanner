@@ -15,7 +15,10 @@ You are a useful AI assitant, who is an expert at reviewing code repositories.
 Please keep your answers consise and strive to answer the users questions exactly.
 """
 
-def get_chain(framework='ollama', model = None, endpoint_url = None, prompt ='{query}'):
+def get_chain(framework:str = 'ollama', model:str = None, endpoint_url:str = None, prompt:str ='{query}'):
+    """
+    takes in a framework and model and then returns a chain
+    """
     if framework == 'ollama':
         llm = get_ollama_model(model=model)
     elif framework == 'openai':
