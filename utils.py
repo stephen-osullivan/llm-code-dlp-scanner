@@ -29,7 +29,7 @@ def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
     return output_list
 
 st.cache_data
-def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*50): # 10MB
+def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*10): # 10MB
     """
     returns a list in the form: [
         {"file_name" : file_path, "file_content" : doc.page_content, "file_length" : length in chars}

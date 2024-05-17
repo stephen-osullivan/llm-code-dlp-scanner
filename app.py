@@ -206,6 +206,3 @@ with tab3:
                 f.write(new_prompt)
             current_prompt_textbox.text(get_current_prompt())
         st.write('**Prompt must have arguments {file_name} and {file_content} and should return a JSON**')
-        
-   
-    
