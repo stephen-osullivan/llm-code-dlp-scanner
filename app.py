@@ -67,7 +67,7 @@ def select_model():
         model = st.selectbox('Model', list_models(endpoint_url))
     
     elif framework == "vllm":
-        default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:11434/v1') # 11434 is ollama
+        default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:8000/v1') # 8000 is vllm
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
         model = st.text_input('Model', "TheBloke/Mistral-7B-Instruct-v0.2-AWQ")
 
