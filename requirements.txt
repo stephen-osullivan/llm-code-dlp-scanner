@@ -1,6 +1,7 @@
 gitpython==3.1.43
 huggingface_hub
 langchain
+langchain-community
 langchain-openai
 openai
 python-dotenv

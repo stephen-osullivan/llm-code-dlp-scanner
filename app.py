@@ -203,8 +203,10 @@ with tab4:
     repos = []
     users = os.listdir(REPO_SAVE_DIR)
     for user in users:
-        user_repos = os.listdir(os.path.join(REPO_SAVE_DIR, user))
-        repos.extend([os.path.join(user, r) for r in user_repos])
+        # loop over all users in the folder
+        if os.path.isdir(user):
+            user_repos = os.listdir(os.path.join(REPO_SAVE_DIR, user))
+            repos.extend([os.path.join(user, r) for r in user_repos if os.path.isdir(r)])
     st.write(repos)
     if st.button('Clear Downloaded Repos'):
         for r in repos:
