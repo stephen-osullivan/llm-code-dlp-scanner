@@ -4,6 +4,10 @@ import streamlit as st
 
 import os
 
+MAX_FILE_SIZE = int(os.environ.get('MAX_FILE_SIZE', 20*1024*1024)) # 20 MB
+MAX_DOC_CHARS = int(os.environ.get('MAX_DOC_CHARS', 15_000)) # 15_000 characters max doc size before chunking
+DOC_CHUNK_CHARS = int(os.environ.get('DOC_CHUNK_CHARS', 2_000)) # 2_000 characters chunks
+
 st.cache_data
 def load_readme_file(directory):
     readme_path = os.path.join(directory, "README.md")
@@ -29,7 +33,7 @@ def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
     return output_list
 
 st.cache_data
-def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*10): # 10MB
+def load_repo_files(repo_local_path, depth=-1, max_size = MAX_FILE_SIZE):
     """
     returns a list in the form: [
         {"file_name" : file_path, "file_content" : doc.page_content, "file_length" : length in chars}
@@ -53,23 +57,29 @@ def load_repo_files(repo_local_path, depth=-1, max_size = 1024*1024*10): # 10MB
                     loader = NotebookLoader(full_path, include_outputs=True)
                 else:
                     loader = TextLoader(full_path, autodetect_encoding=True)
+                
                 docs = loader.load()
-                for doc in splitter.split_documents(docs):
-                    documents.append(
-                        {
-                            "file_name" : file_path, 
-                            "file_content" : doc.page_content, 
-                            "file_length": len(doc.page_content)
-                        })
+                full_doc_len = len(docs[0].page_content)
+                if full_doc_len < MAX_DOC_CHARS:
+                    split_docs = splitter.split_documents(docs)
+                    for chunk_idx, doc in enumerate(split_docs):
+                        documents.append(
+                            {   
+                                "file_name" : file_path, 
+                                "file_content" : doc.page_content, 
+                                "file_length": len(doc.page_content),
+                                "chunk_idx": chunk_idx,
+                                "total_chunks": len(split_docs)
+                            })
             except Exception as e:
                 print('Failed to decode:', file_path, 'Exception:', e)
     # Now you can use the 'documents' list with LangChain
     print(f"Loaded {len(documents)} documents from the changed files.")
+    
     return documents
     
 # Function to traverse directories and read file contents
 def concatenate_docs(documents, output_file):
-
     with open(output_file, 'w') as f:
         f.flush()
         for doc in documents:
