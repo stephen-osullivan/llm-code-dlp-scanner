@@ -4,14 +4,19 @@ This is your sole task.
 Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
 
 Look for the following types of sensitive information:
-- Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AKIAXXXXXXXXXXXXXXX, azure_subscription_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-- Private SSH keys or passwords
-- exposed Database usernames, passwords, and connection strings
-- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
-- Sensitive comments or TODO notes revealing vulnerabilities or private information
-- Email addresses and private communication
+- Hardcoded API KEYS, TOKENS or secret credentials 
+e.g. "AWS_TOKEN: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "azure_subscription_key: az-siafjian899900a000kaiagai"
 
-Only report instances where the sensitive information is explicitly visible as strings and hard coded in the file.
+- Exposed Database usernames, passwords, and connection strings
+e.g. AccountName=sos500@lbg, AccountKey=M02bnQpLpmLE Waxl2BcVuwuYbHmzFHbYpUfkRJhVcD5Sq1tnGw==
+
+- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers 
+e.g. "stevehilton@gmail.com" or "DOB: 03/02/1990"
+
+Only report instances where the sensitive information is EXPLICITLY visible as strings and HARD CODED in the file.
+Do not identify text or functions that reference or imply sensitive data leaks or could lead to data leaks when used. 
+Only identify the explicit strings containing visible data leaks.
+
 The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
 
 Think through this step by step:
@@ -26,11 +31,11 @@ If the file contains leaks of sensitive information:
 
 1) Count the number of leaks found.
 
-2) For each instance of sensitive data found, provide the outputs in JSON format with the following keys:
+2) For each line in the file containing sensitive data, provide the an output in JSON format with the following keys:
 line_number: [Line number where the sensitive data is located]
-type_of_data: [Type of sensitive data]
-description: [Brief description of the sensitive data]
-sensitive_data : [the senstive data as it appears in the file]
+type_of_data: [Type of sensitive data in the line]
+description: [Brief description of the sensitive data in the line]
+sensitive_data : [the line of the file containing the sensitive data as it appears in the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]
@@ -54,13 +59,13 @@ The output must follow this form exactly. A JSON object must always be returned.
             "line_number": 1, 
             "type_of_data": "Hardcoded API KEY", 
             "description": "AWS_API_Key", 
-            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
+            "sensitive_data": "ak-afahiajfoaj200-akfai6000fajiiaj" 
         }}, 
         {{ 
             "line_number": 2, 
             "type_of_data": "Hardcoded API KEY", 
             "description": "CLOUD_TOKEN", 
-            "sensitive_data": "awufjakjfaokaf789ghi" 
+            "sensitive_data": "accountKey=M02bnQpLpmLE Waxl2BcVuwuYbHmzFHbYpUfkRJhVcD5Sq1tnGw==" 
         }}] 
 }}
 

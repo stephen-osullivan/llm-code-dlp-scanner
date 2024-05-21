@@ -1,11 +1,13 @@
 from git import Repo
 import streamlit as st
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
 import concurrent.futures
 from io import StringIO
 import json
 import os
 import shutil
+
 
 from chains import get_chain
 from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models
@@ -37,6 +39,7 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
 
         # print results as and when they come in
         for future in concurrent.futures.as_completed(threads):
+            json_parser, str_parser = JsonOutputParser(), StrOutputParser()
             with st.chat_message('AI'):
                 doc, response = future.result()
                 st.write(doc['file_name'])
@@ -44,9 +47,9 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                 st.write()
                 try:
                     #response = json.loads(response)
-                    st.json(response)
+                    st.json(json_parser.invoke(response))
                 except:
-                    st.write(response)
+                    st.write(str_parser.invoke(response))
 
 def select_model():
     """

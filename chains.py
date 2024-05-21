@@ -33,7 +33,7 @@ def get_chain(framework:str = 'ollama', model:str = None, endpoint_url:str = Non
         raise NotImplementedError
     
     prompt_template = get_prompt_template(prompt=prompt)
-    return prompt_template | llm | JsonOutputParser()#StrOutputParser()
+    return prompt_template | llm 
 
 def get_ollama_model(model = 'llama3'):
     llm = ollama.Ollama(
