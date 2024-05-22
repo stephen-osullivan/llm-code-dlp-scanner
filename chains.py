@@ -75,7 +75,7 @@ def get_vllm_model(model, endpoint_url):
         openai_api_key="EMPTY",
         openai_api_base=endpoint_url,
         max_tokens=1024,
-        model_name=model)
+        model_name=model, temperature=0)
     return llm
 
 
