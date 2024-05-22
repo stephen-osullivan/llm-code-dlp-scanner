@@ -16,7 +16,7 @@ The FILE CONTENT may contain multiple instances of senstive information, separat
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
-Carefully, go through the file line by line and look for instances of sensitiive information.
+Carefully, go through the file line by line and look for instances of senstiive information.
 Then return the output exactly in the JSON format described below.
 Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
 
@@ -26,39 +26,22 @@ If the file contains leaks of sensitive information:
 
 1) Count the number of leaks found.
 
-2) For each instance of sensitive data found, provide the outputs in JSON format with the following keys:
+2) For each line in the file containing sensitive data, provide the outputs in JSON format with the following keys:
 line_number: [Line number where the sensitive data is located]
 type_of_data: [Type of sensitive data]
 description: [Brief description of the sensitive data]
-sensitive_data : [the senstive data as it appears in the file]
+sensitive_data : [the senstive data as it appears in the line of the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]
 file description : [brief decription of what the file is doing]
 sensitive data count: [the number of leaks found in the file.]
-sensitive data: [a list of the JSON objects containing the sensitive data created in step 2 above. This should be EMPTY if there is no sensitive data.]
+sensitive data: description: [brief description of the sensitive data in the file. This should be empty if there is no sensitive data.]
+sensitive data: a list of the JSON objects containing the sensitive data created in step 2 above.
 
-The output must follow this form exactly. A JSON object must always be returned. Do not give any other sort of output.
+The output must follow this form exactly. A JSON object must always be returned. Do not give any other sort of output. 
 
-####################################### EXAMPLES #######################################
-
-<EXAMPLE INPUT #1>
-
-<FILE NAME>
-
-config.env
-
-<FILE CONTENT>
-
-TRAIN_MODEL=True
-USE_GPU=True
-AWS_API_KEY=aws-afahiajfoaj-akfaijfajiiaj
-CLOUD_TOKEN=sk-awufjakjfaokaf789ghi
-OPENAI_API_KEY=dummytoken
-
-<FILE END>
-
-<EXAMPLE OUTPUT #1>:
+<EXAMPLE OUTPUT>:
 
 <OUTPUT JSON>:
 
@@ -69,52 +52,19 @@ OPENAI_API_KEY=dummytoken
     "sensitive data": [ 
         {{ 
             "line_number": 1, 
-            "type_of_data": "Exposed API KEY", 
+            "type_of_data": "Hardcoded API KEY", 
             "description": "AWS_API_Key", 
-            "sensitive_data": "aws-afahiajfoaj-akfaijfajiiaj" 
+            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
         }}, 
         {{ 
             "line_number": 2, 
-            "type_of_data": "Exposed API KEY", 
+            "type_of_data": "Hardcoded API KEY", 
             "description": "CLOUD_TOKEN", 
-            "sensitive_data": "sk-awufjakjfaokaf789ghi" 
+            "sensitive_data": "awufjakjfaokaf789ghi" 
         }}] 
 }}
 
-<EXAMPLE INPUT #2>
 
-<FIEL_NAME>
-
-utilities.js
-
-<FILE CONTENT>
-
-//  calculate the sum of elements in an array
-function calcArraySum(array) {{
-return array.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-}}
-
-// Helper function to calculate the average of elements in an array
-function calcArrayAverage(array) {{
-const sum = calcArraySum(array);
-return sum / array.length;
-}}
-
-<FILE END>
-
-<EXAMPLE OUTPUT #2>:
-
-<OUTPUT JSON>:
-
-{{ 
-    "file name": "utilities.c", 
-    "file description": "C file containing utility functions", 
-    "sensitive data count": 0, 
-    "sensitive data": [] 
-}}
-
-####################################### EXAMPLES FINISHED #######################################
- 
 ```
 <FILE NAME>:
 
@@ -126,5 +76,4 @@ return sum / array.length;
 
 <FILE END>
 ```
-
 <OUTPUT JSON>:
