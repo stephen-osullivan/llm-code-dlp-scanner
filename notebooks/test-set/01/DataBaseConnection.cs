@@ -4,9 +4,10 @@ class Program
 {
     static void Main(string[] args)
     {
+        # hardcoded example
         string connectionString = "Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassw0rd;";
-        string creditCardNumber = "5555555555554444";
-        string cvv = "123";
+        string creditCardNumber = "1032723955554444";
+        string cvv = "154";
         string expiryDate = "06/27";
 
         Console.WriteLine("Connection String: " + connectionString);
