@@ -45,7 +45,7 @@ def load_repo_files(repo_local_path, depth=-1, max_size = MAX_FILE_SIZE):
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=1)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=DOC_CHUNK_CHARS, chunk_overlap=1)
 
     # Load the changed files into LangChain documents
     documents = []
