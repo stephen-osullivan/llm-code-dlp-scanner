@@ -10,7 +10,10 @@ import shutil
 
 
 from chains import get_chain
-from utils import list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models
+from utils import (
+    list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models,
+    responses_to_df, summarise_responses, get_leaks_df
+)
 
 st.set_page_config(page_title="Repo Security Analysis", layout="wide")
 st.title('Repo Security Analysis 🪬')
@@ -30,24 +33,30 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             file_name = invoke_args['file_name']
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
-            #return invoke_args['file_name'], extract_json(chain.invoke(invoke_args))
             return doc, chain.invoke(invoke_args)
 
-        threads = []
+        threads = []       
         for doc in docs:
+            # submit threads
             threads.append(executor.submit(get_formatted_response, chain, doc))
+            
 
         # print results as and when they come in
+        st.session_state["response_list"] = list()
         for future in concurrent.futures.as_completed(threads):
             json_parser, str_parser = JsonOutputParser(), StrOutputParser()
             with st.chat_message('AI'):
                 doc, response = future.result()
-                st.write(doc['file_name'])
-                st.write(f"Chunk {doc['chunk_idx']+1} of {doc['total_chunks']}")
+                file_name, chunk_idx, start_line = doc['file_name'], doc['chunk_idx'], doc['start_line']
+                total_chunks = doc['total_chunks']
+                st.write(file_name, f"Chunk {chunk_idx+1} of {total_chunks}")
                 st.write()
                 try:
-                    #response = json.loads(response)
-                    st.json(json_parser.invoke(response))
+                    # try to convert to json
+                    response = json_parser.invoke(response)
+                    st.json(response)
+                    st.session_state["response_list"].append(
+                        dict(file_name=file_name, chunk_idx=chunk_idx, start_line=start_line, response = response))
                 except:
                     st.write(str_parser.invoke(response))
 
@@ -119,7 +128,7 @@ def show_repo_files(repo_local_path):
     repo_files = [d for d in repo_list if d['blob_type'] =='blob']
     repo_dirs = [d for d in repo_list if d['blob_type'] =='tree']
     out_string = '**Repo Files:**\n\n'
-    out_string = out_string + ", ".join([f"{d['file_path']}: {d['file_size']/1024:.2f} KB" for d in repo_files])
+    out_string = out_string + "\n".join([f"{d['file_path']}: {d['file_size']/1024:.2f} KB" for d in repo_files])
     out_string = out_string + '\n\n**Repo Dirs:**\n\n' + '\n'.join([d['file_path'] for d in repo_dirs])
     st.write(out_string)
 
@@ -140,7 +149,8 @@ with st.sidebar:
     repo_local_path =  get_repo()
 
 ### Main section
-if repo_local_path and os.path.isdir(repo_local_path):
+local_repo_exists = repo_local_path and os.path.isdir(repo_local_path)
+if local_repo_exists:
     # Display Repo Metrics in header
     files = list_repo(repo_local_path, depth=-1, files_only=True)
     num_files = len(files)
@@ -154,10 +164,10 @@ if repo_local_path and os.path.isdir(repo_local_path):
     col1.metric('Files in Repo', num_files)
     col2.metric('Repo Size', size)
 
-tab1, tab2, tab3, tab4 = st.tabs(['View Repo', 'Scan Repo', 'Change Prompt', 'Clear Cache'])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Repo', 'Scan Repo', 'Scan Results', 'Change Prompt', 'Clear Cache'])
 with tab1:
     # View Repo Readme or Files
-    if repo_local_path:
+    if local_repo_exists:
         col1, col2 = st.columns([2,1])
         with col1:
             if st.toggle('Show README.md'):
@@ -173,7 +183,8 @@ with tab1:
 with tab2:
     # Analyse Repo files with LLM
     if repo_local_path:
-        if st.button('Analyse Repo Files'):  
+        if st.button('Analyse Repo Files'): 
+            st.session_state['response_list'] = None
             # analyse the files in the repo for PII leaks.
             docs = load_repo_files(repo_local_path=repo_local_path) 
             prompt = get_current_prompt()                        
@@ -183,6 +194,23 @@ with tab2:
         st.write('**Use sidebar to select a repo**')
 
 with tab3:
+    if 'response_list' in st.session_state:
+        responses_df = responses_to_df(st.session_state['response_list'])
+        summary_df = summarise_responses(responses_df)
+        leaks_df = get_leaks_df(responses_df)
+        st.metric('Leaks Found', summary_df['sensitive data count'].sum())
+        if st.toggle('Show Summary', True):
+            st.dataframe(
+                summary_df, use_container_width=True,
+                column_config = {
+                "sensitive data count" : st.column_config.ProgressColumn(
+                    "sensitive data count", min_value = 0, max_value = 10,
+                    format="%i")})
+            
+        if st.toggle('Show Leaks', True):
+            st.dataframe(leaks_df, use_container_width=True)
+
+with tab4:
     ### Options to view and change Prompt
     col1, col2 = st.columns((1,1))
     
@@ -201,15 +229,16 @@ with tab3:
             current_prompt_textbox.text(get_current_prompt())
         st.write('**Prompt must have arguments {file_name} and {file_content} and should return a JSON**')
     
-with tab4:
+with tab5:
     st.write('**Repos Downloaded:**')
     repos = []
     users = os.listdir(REPO_SAVE_DIR)
     for user in users:
         # loop over all users in the folder
-        if os.path.isdir(user):
-            user_repos = os.listdir(os.path.join(REPO_SAVE_DIR, user))
-            repos.extend([os.path.join(user, r) for r in user_repos if os.path.isdir(r)])
+        user_path = os.path.join(REPO_SAVE_DIR, user)
+        if os.path.isdir(user_path):
+            user_repos = os.listdir(user_path)
+            repos.extend([os.path.join(user, r) for r in user_repos if os.path.isdir(os.path.join(user_path, r))])
     st.write(repos)
     if st.button('Clear Downloaded Repos'):
         for r in repos:

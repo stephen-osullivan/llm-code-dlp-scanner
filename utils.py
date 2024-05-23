@@ -1,12 +1,14 @@
 from git import repo, Repo
+import pandas as pd
 import requests
 import streamlit as st
 
 import os
 
+# ENVIROMENT VARIABLES
 MAX_FILE_SIZE = int(os.environ.get('MAX_FILE_SIZE', 20*1024*1024)) # 20 MB
 MAX_DOC_CHARS = int(os.environ.get('MAX_DOC_CHARS', 15_000)) # 15_000 characters max doc size before chunking
-DOC_CHUNK_CHARS = int(os.environ.get('DOC_CHUNK_CHARS', 2_000)) # 2_000 characters chunks
+DOC_CHUNK_CHARS = int(os.environ.get('DOC_CHUNK_CHARS', 1_000)) # 1_000 characters chunks
 
 st.cache_data
 def load_readme_file(directory):
@@ -62,6 +64,7 @@ def load_repo_files(repo_local_path, depth=-1, max_size = MAX_FILE_SIZE):
                 full_doc_len = len(docs[0].page_content)
                 if full_doc_len < MAX_DOC_CHARS:
                     split_docs = splitter.split_documents(docs)
+                    start_line = 0
                     for chunk_idx, doc in enumerate(split_docs):
                         documents.append(
                             {   
@@ -69,8 +72,10 @@ def load_repo_files(repo_local_path, depth=-1, max_size = MAX_FILE_SIZE):
                                 "file_content" : doc.page_content, 
                                 "file_length": len(doc.page_content),
                                 "chunk_idx": chunk_idx,
-                                "total_chunks": len(split_docs)
+                                "total_chunks": len(split_docs),
+                                "start_line" : start_line,
                             })
+                        start_line += doc.page_content.count('\n') + 1
             except Exception as e:
                 print('Failed to decode:', file_path, 'Exception:', e)
     # Now you can use the 'documents' list with LangChain
@@ -114,3 +119,33 @@ def list_models(endpoint_url):
     except Exception as e:
         print(e)
         return ['Failed to connect to host.']
+
+@st.cache_data
+def responses_to_df(response_list):
+    # converts the list of responses into a dataframe
+    df = pd.DataFrame([r['response'] for r in response_list])
+    df['chunk_idx'] = [r['chunk_idx'] for r in response_list]
+    df['file name'] = [r['file_name'] for r in response_list]
+    df['start_line'] = [r['start_line'] for r in response_list]
+    return df
+
+@st.cache_data
+def summarise_responses(responses_df):
+    # summarise the responses data frame to show the leaks in each fiel
+    df_summary = responses_df.groupby('file name').agg({'file description': 'first', 'sensitive data count': 'sum'})
+    return df_summary
+
+@st.cache_data
+def get_leaks_df(responses_df):
+    # takes the dataframe of responses and unpacks the leaks into a new dataframe
+    df_leaks = []
+    responses_df = responses_df[responses_df['sensitive data'].apply(len)>0]
+    for idx, row in  responses_df.iterrows():
+        for d in row['sensitive data']:
+            new_row = {'file name' : row['file name']} | d
+            new_row['line_number'] += row['start_line']
+            df_leaks.append(new_row)
+    return pd.DataFrame(df_leaks)
+
+
+
