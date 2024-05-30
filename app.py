@@ -1,30 +1,34 @@
-from git import Repo
-import streamlit as st
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from git import Repo
+import pandas as pd
+import streamlit as st
 
 import concurrent.futures
 from io import StringIO
 import json
+import math
 import os
 import shutil
 
-
 from chains import get_chain
 from utils import (
-    list_repo, load_readme_file, load_repo_files, concatenate_docs, extract_json, list_models,
-    responses_to_df, summarise_responses, get_leaks_df
+    download_git_repo, list_branches, switch_branch, list_repo, load_readme_file, load_repo_files, 
+    list_models, responses_to_df, summarise_responses, get_leaks_df, batch_load
 )
 
-st.set_page_config(page_title="Repo Security Analysis", layout="wide")
-st.title('Repo Security Analysis 🪬')
+st.set_page_config(page_title="Repo Leak Scanner", layout="wide")
+st.title('Repo Leak Scanner 🪬')
 
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
-repo_local_path = None
+CONCURRENT_REQUEST_LIMIT = os.environ.get('CONCURRENT_REQUEST_LIMIT', 200)
+
+if 'key' not in st.session_state:
+    st.session_state['key'] = 'value'
 
 ########################### APP FUNCTIONS #######################################
-def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
+def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
     """
-    use multithreading to submitted files for analysis concurrently.
+    use multithreading to submit files for analysis concurrently.
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:    
 
@@ -34,33 +38,42 @@ def get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
             return doc, chain.invoke(invoke_args)
-
-        threads = []       
-        for doc in docs:
-            # submit threads
-            threads.append(executor.submit(get_formatted_response, chain, doc))
-            
-
-        # print results as and when they come in
+        
+        num_batches = math.ceil(len(docs)/CONCURRENT_REQUEST_LIMIT)
         st.session_state["response_list"] = list()
-        for future in concurrent.futures.as_completed(threads):
-            json_parser, str_parser = JsonOutputParser(), StrOutputParser()
-            with st.chat_message('AI'):
-                doc, response = future.result()
-                file_name, chunk_idx, start_line = doc['file_name'], doc['chunk_idx'], doc['start_line']
-                total_chunks = doc['total_chunks']
-                st.write(file_name, f"Chunk {chunk_idx+1} of {total_chunks}")
-                st.write()
-                try:
-                    # try to convert to json
-                    response = json_parser.invoke(response)
-                    st.json(response)
-                    st.session_state["response_list"].append(
-                        dict(file_name=file_name, chunk_idx=chunk_idx, start_line=start_line, response = response))
-                except:
-                    st.write(str_parser.invoke(response))
+        batch_progress_bar = st.progress(0, f'Running batches')
+        response_progress_bar = st.progress(0, text = f'Sending Requests')
+        for batch_idx, batch in enumerate(batch_load(docs, batch_size=CONCURRENT_REQUEST_LIMIT)):
+            batch_progress_bar.progress(batch_idx/num_batches, f'Running batch {batch_idx+1} of {num_batches}')
+            batch_size = len(batch)
+            threads = []
+            
+            response_progress_bar.progress(0, text = f'Sending Requests')
+            for idx, doc in enumerate(batch):
+                # submit threads
+                threads.append(executor.submit(get_formatted_response, chain, doc))
 
-def select_model():
+            # print results as and when they come in            
+            for idx, future in enumerate(concurrent.futures.as_completed(threads)):
+                response_progress_bar.progress((idx+1)/batch_size, text = f'Completed request {idx+1} of {batch_size}' )
+                json_parser, str_parser = JsonOutputParser(), StrOutputParser()
+                with st.chat_message('AI'):
+                    doc, response = future.result()
+                    file_name, chunk_idx, start_line = doc['file_name'], doc['chunk_idx'], doc['start_line']
+                    total_chunks = doc['total_chunks']
+                    st.write(file_name, f"Chunk {chunk_idx+1} of {total_chunks}")
+                    st.write()
+                    try:
+                        # try to convert to json
+                        response = json_parser.invoke(response)
+                        st.json(response)
+                        st.session_state["response_list"].append(
+                            dict(file_name=file_name, chunk_idx=chunk_idx, start_line=start_line, response = response))
+                    except:
+                        st.write(str_parser.invoke(response))
+        batch_progress_bar.progress(100, f'Finished {num_batches} batches.')
+
+def app_select_model():
     """
     select a frame work and thena  model from those available
     """
@@ -81,56 +94,57 @@ def select_model():
     elif framework == "vllm":
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:8000/v1') # 8000 is vllm
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
-        model = st.text_input('Model', "TheBloke/Mistral-7B-Instruct-v0.2-AWQ")
+        model = st.text_input('Model', "/models/TheBloke/Mistral-7B-Instruct-v0.2-AWQ")
 
     elif framework == 'huggingface':
         model = st.selectbox('Model', ["mistralai/Mistral-7B-Instruct-v0.2", "google/gemma-1.1-7b-it", "meta-llama/Meta-Llama-3-8B-Instruct"])
     
     return framework, model, endpoint_url
 
-def get_repo():
+def app_get_repo():
     """
     download a repo if necessary or point to a local one
     """
-    repo_local_path=None
     repo_type = st.selectbox('Repo Type', ['Local', 'Online'])
-    
     if repo_type == 'Online':
-        repo_url = st.text_input(
-            'Please enter a github repo url: https://github.com/user/repo.git')
-        
+        repo_url = st.text_input('Please enter a github repo url: https://github.com/user/repo.git')
         if repo_url:
-            st.write(f'**Repo:** {repo_url}')
             download_repo = st.button('Download Repo')
-            repo_local_path = os.path.join(REPO_SAVE_DIR, '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
-            
             if download_repo:
-                # Clone the repository
-                if os.path.exists(repo_local_path):
-                    # Remove the existing directory and its contents
-                    shutil.rmtree(repo_local_path)
-                repo = Repo.clone_from(repo_url, repo_local_path)
-                st.write('Download Successful.')
+                local_repo_path = download_git_repo(repo_url)
+                st.toast('Download Successful.', icon='✅')
+                st.session_state['local_repo_path'] = local_repo_path
+                st.session_state['docs']=None
     
     elif repo_type == 'Local':
-        repo_local_path = st.text_input('Enter Repo Path')
-        if repo_local_path:
-            st.write(f'**Repo**: {repo_local_path}')
+        local_repo_path = st.text_input('Enter Repo Path')
+        if local_repo_path:
+            if os.path.exists(local_repo_path):
+                st.toast('Local Repo found.', icon='✅')
+                st.session_state['local_repo_path'] = local_repo_path
     
-    return repo_local_path
 
 @st.cache_data
-def show_repo_files(repo_local_path):
+def app_show_repo_files(repo_local_path):
     """
     list the files in repo
     """
-    repo_list = list_repo(repo_local_path)
-    repo_files = [d for d in repo_list if d['blob_type'] =='blob']
-    repo_dirs = [d for d in repo_list if d['blob_type'] =='tree']
-    out_string = '**Repo Files:**\n\n'
-    out_string = out_string + "\n".join([f"{d['file_path']}: {d['file_size']/1024:.2f} KB" for d in repo_files])
-    out_string = out_string + '\n\n**Repo Dirs:**\n\n' + '\n'.join([d['file_path'] for d in repo_dirs])
-    st.write(out_string)
+    repo_list = list_repo(repo_local_path, depth=-1)
+    total_size = sum(blob['file_size'] for blob in repo_list)
+    for blob in repo_list:
+        # format responses
+        if blob['blob_type'] == 'blob':
+            blob['blob_type'] = 'file'
+        elif blob['blob_type'] == 'tree':
+            blob['blob_type'] = 'directory'
+        blob['file_size'] = blob['file_size']/(1024) # MB
+
+    st.dataframe(
+        pd.DataFrame(repo_list)[['file_path', 'file_size']],
+        column_config={
+            'file_path' : 'file',
+            'file_size' : st.column_config.NumberColumn('size', format="%d KB", disabled=True)},
+        use_container_width=True)
 
 def get_current_prompt() -> str:
     with open('prompts/prompt-current.txt', 'r') as f:
@@ -139,20 +153,27 @@ def get_current_prompt() -> str:
 
 ########################### STREAMLIT APP #######################################
 
+# Initialise Session State
+session_state_vars = ['local_repo_path', 'docs', 'response_list']
+for key in session_state_vars:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
 ### SIDE BAR
 with st.sidebar:
     # side bar options
-    st.write('**Select Model:**')
-    framework, model, endpoint_url = select_model()
-    st.write('#')
-    st.write('**Select Repo:**')
-    repo_local_path =  get_repo()
-
+    framework, model, endpoint_url = app_select_model()
+    app_get_repo()
+    if st.session_state['local_repo_path']:
+        branch_name = st.selectbox('Switch Branch', list_branches(st.session_state['local_repo_path']))
+        if st.button('Switch'):
+            switch_branch(st.session_state['local_repo_path'], branch_name)
+        
 ### Main section
-local_repo_exists = repo_local_path and os.path.isdir(repo_local_path)
-if local_repo_exists:
+
+if st.session_state['local_repo_path']:
     # Display Repo Metrics in header
-    files = list_repo(repo_local_path, depth=-1, files_only=True)
+    files = list_repo(st.session_state['local_repo_path'], depth=-1, files_only=True)
     num_files = len(files)
     size = sum(d['file_size'] for d in files)
     if size < (1024*1024*1024):
@@ -167,34 +188,40 @@ if local_repo_exists:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Repo', 'Scan Repo', 'Scan Results', 'Change Prompt', 'Clear Cache'])
 with tab1:
     # View Repo Readme or Files
-    if local_repo_exists:
+    if st.session_state['local_repo_path']:
         col1, col2 = st.columns([2,1])
         with col1:
             if st.toggle('Show README.md'):
-                readme_file_string = load_readme_file(repo_local_path)
+                readme_file_string = load_readme_file(st.session_state['local_repo_path'])
                 st.markdown(readme_file_string, unsafe_allow_html=True)
 
         with col2:
             if st.toggle('Show Repo Files'):
-                show_repo_files(repo_local_path=repo_local_path)
+                app_show_repo_files(repo_local_path=st.session_state['local_repo_path'])
     else:
         st.write('**Use sidebar to select a repo**')
 
 with tab2:
     # Analyse Repo files with LLM
-    if repo_local_path:
-        if st.button('Analyse Repo Files'): 
+    if st.session_state['local_repo_path']:
+        if st.button('Load Repo Files'): 
             st.session_state['response_list'] = None
             # analyse the files in the repo for PII leaks.
-            docs = load_repo_files(repo_local_path=repo_local_path) 
-            prompt = get_current_prompt()                        
-            chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url)
-            get_multi_threaded_response(chain=chain, docs=docs)
+            st.session_state['docs'] = load_repo_files(repo_local_path=st.session_state['local_repo_path'])     
+
+        if st.session_state['docs']:
+            num_docs = len(st.session_state['docs'])
+            num_batches = math.ceil(num_docs/CONCURRENT_REQUEST_LIMIT)
+            st.write(f"**{num_docs}** requests will be made. **{num_batches}** batch{'es' if num_batches>1 else''}")
+            if st.button('Initiate Scan'):
+                prompt = get_current_prompt()                        
+                chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url)
+                app_get_multi_threaded_response(chain=chain, docs=st.session_state['docs'])
     else:
         st.write('**Use sidebar to select a repo**')
 
 with tab3:
-    if 'response_list' in st.session_state:
+    if st.session_state['response_list']:
         responses_df = responses_to_df(st.session_state['response_list'])
         summary_df = summarise_responses(responses_df)
         leaks_df = get_leaks_df(responses_df)
@@ -230,7 +257,6 @@ with tab4:
         st.write('**Prompt must have arguments {file_name} and {file_content} and should return a JSON**')
     
 with tab5:
-    st.write('**Repos Downloaded:**')
     repos = []
     users = os.listdir(REPO_SAVE_DIR)
     for user in users:

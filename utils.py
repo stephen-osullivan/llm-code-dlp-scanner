@@ -1,37 +1,68 @@
 from git import repo, Repo
+from git.refs import RemoteReference
 import pandas as pd
 import requests
 import streamlit as st
 
+
 import os
+import shutil
 
 # ENVIROMENT VARIABLES
+DOC_CHUNK_CHARS = int(os.environ.get('DOC_CHUNK_CHARS', 1_000)) # 1_000 characters chunks
 MAX_FILE_SIZE = int(os.environ.get('MAX_FILE_SIZE', 20*1024*1024)) # 20 MB
 MAX_DOC_CHARS = int(os.environ.get('MAX_DOC_CHARS', 15_000)) # 15_000 characters max doc size before chunking
-DOC_CHUNK_CHARS = int(os.environ.get('DOC_CHUNK_CHARS', 1_000)) # 1_000 characters chunks
+REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
+
+def download_git_repo(url: str) -> str:
+    """
+    download a repo using git python and saves it in REPO_SAVE_DIR
+    """
+
+    repo_local_path = os.path.join(REPO_SAVE_DIR, '/'.join(url.split('/')[-2:]).split('.git')[0])
+            
+    if os.path.exists(repo_local_path):
+        # Remove the existing directory and its contents
+        shutil.rmtree(repo_local_path)
+
+    # Clone the repository
+    Repo.clone_from(url, repo_local_path)
+    return repo_local_path
+
+def list_branches(repo_local_path:str) -> list:
+    """
+    takes a git repo path and returns a list of branches 
+    """
+    repo = Repo(repo_local_path)
+    return [ref.name.removeprefix('origin/') for ref in repo.refs if isinstance(ref, RemoteReference)]
+
+def switch_branch(local_repo_path:str, branch_name:str):
+    """
+    takes a local repo path and branch name and then checks out that branch
+    """
+    branches = list_branches(local_repo_path)
+    if branch_name in branches:
+        repo = Repo(local_repo_path)
+        repo.git.checkout(branch_name)
+    else:
+        raise ValueError('Branch does not exist')
 
 st.cache_data
-def load_readme_file(directory):
-    readme_path = os.path.join(directory, "README.md")
-    if os.path.exists(readme_path):
-        with open(readme_path, "r", encoding="utf-8") as f:
-            readme_content = f.read()
-        return readme_content
-    else:
-        return "No README file found in the specified directory."
-    
-st.cache_data
-def list_repo(repo_local_path, commit_hash='HEAD', depth = 1, files_only=False):
-    commit = Repo(repo_local_path).commit(commit_hash)
+def list_repo(repo_local_path, depth = 1, files_only=False) -> list:
+    """
+    go through a repo a list the files and their size
+    """
+    commit = Repo(repo_local_path).commit('HEAD')
     tree = commit.tree
     output_list = []
     # Traverse the tree and list files with their sizes
     for blob in tree.traverse(depth=depth):
         file_path = os.path.join(repo_local_path, blob.path)
-        file_size = os.path.getsize(file_path)
-        if files_only and blob.type =='tree':
-            continue
-        output_list.append({'blob_type': blob.type, 'file_path' : blob.path, 'file_size': file_size})
+        if os.path.isfile(file_path):
+            file_size = os.path.getsize(file_path)
+            if files_only and blob.type =='tree':
+                continue
+            output_list.append({'blob_type': blob.type, 'file_path' : blob.path, 'file_size': file_size})
     return output_list
 
 st.cache_data
@@ -82,28 +113,22 @@ def load_repo_files(repo_local_path, depth=-1, max_size = MAX_FILE_SIZE):
     print(f"Loaded {len(documents)} documents from the changed files.")
     
     return documents
+
+st.cache_data
+def load_readme_file(directory):
+    """
+    read the readme filde in a directory
+    """
+    readme_path = os.path.join(directory, "README.md")
+    if os.path.exists(readme_path):
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme_content = f.read()
+        return readme_content
+    else:
+        return "No README file found in the specified directory."
     
-# Function to traverse directories and read file contents
-def concatenate_docs(documents, output_file):
-    with open(output_file, 'w') as f:
-        f.flush()
-        for doc in documents:
-            f.writelines(["#"*50 + '\n', doc.metadata['source'], '\n' + "#"*50 + '\n\n'])
-            f.writelines(doc.page_content)
-            f.writelines("\n\n")
 
-
-def extract_json(s):
-    """
-    extracts a json from a string
-    """
-    start = s.find('{')
-    if start == -1:
-        # if not a JSON then return the string.
-        return s
-    end = len(s) - s[::-1].find('}')    
-    return s[start:end]
-
+    
 def list_models(endpoint_url):
     """
     list the models available at the endpoint
@@ -147,5 +172,13 @@ def get_leaks_df(responses_df):
             df_leaks.append(new_row)
     return pd.DataFrame(df_leaks)
 
-
-
+def batch_load(iterator, batch_size):
+    """
+    batch loads an iterator in python
+    """
+    start, end = 0, batch_size
+    
+    while start < len(iterator):
+        yield iterator[start:end]
+        start = end
+        end += batch_size
