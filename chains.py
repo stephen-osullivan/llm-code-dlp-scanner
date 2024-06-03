@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from langchain_community.llms import ollama, HuggingFaceEndpoint, vllm
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
@@ -15,7 +15,7 @@ You are a useful AI assitant, who is an expert at reviewing code repositories.
 Please keep your answers consise and strive to answer the users questions exactly.
 """
 
-def get_chain(framework:str = 'ollama', model:str = None, endpoint_url:str = None, prompt:str ='{query}'):
+def get_chain(framework:str = 'ollama', model:str = None, endpoint_url:str = None, prompt:str ='{query}', parser = None):
     """
     takes in a framework and model and then returns a chain
     """
@@ -32,7 +32,7 @@ def get_chain(framework:str = 'ollama', model:str = None, endpoint_url:str = Non
     else:
         raise NotImplementedError
     
-    prompt_template = get_prompt_template(prompt=prompt)
+    prompt_template = get_prompt_template(prompt=prompt, parser=parser)
     return prompt_template | llm 
 
 def get_ollama_model(model = 'llama3'):
@@ -80,9 +80,17 @@ def get_vllm_model(model, endpoint_url):
     return llm
 
 
-def get_prompt_template(prompt):
-    prompt_template = ChatPromptTemplate.from_messages(
-        ('human', prompt),
-    )
+def get_prompt_template(prompt, parser=None):
+    if parser:
+        prompt_template = PromptTemplate.from_template(
+            prompt,
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        
+        )
+    else:
+        prompt_template = ChatPromptTemplate.from_messages(
+            [('human', prompt)],
+        
+        )
     return prompt_template
 

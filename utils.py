@@ -152,24 +152,34 @@ def responses_to_df(response_list):
     df['chunk_idx'] = [r['chunk_idx'] for r in response_list]
     df['file name'] = [r['file_name'] for r in response_list]
     df['start_line'] = [r['start_line'] for r in response_list]
+    df['total_chunks'] = [r['total_chunks'] for r in response_list]
+    
     return df
 
 @st.cache_data
 def summarise_responses(responses_df):
     # summarise the responses data frame to show the leaks in each fiel
-    df_summary = responses_df.groupby('file name').agg({'file description': 'first', 'sensitive data count': 'sum'})
+    df_summary = responses_df.groupby('file name').agg(
+        {'file_description': 'first', 'sensitive_data_count': 'sum', 'chunk_idx':'count', 'total_chunks':'first'})
+    # compute failed requests: since only successful requests are saved, this is total chunks - row count
+    df_summary.iloc[:,-1] = df_summary.iloc[:,-1] - df_summary.iloc[:,-2] 
+    df_summary.rename(columns={'chunk_idx': 'successful requests', 'total_chunks' : 'failed requests'}, inplace=True)
     return df_summary
 
 @st.cache_data
 def get_leaks_df(responses_df):
     # takes the dataframe of responses and unpacks the leaks into a new dataframe
     df_leaks = []
-    responses_df = responses_df[responses_df['sensitive data'].apply(len)>0]
+    responses_df = responses_df[responses_df.get('sensitive_data_count', 0) > 0]
     for idx, row in  responses_df.iterrows():
-        for d in row['sensitive data']:
-            new_row = {'file name' : row['file name']} | d
-            new_row['line_number'] += row['start_line']
-            df_leaks.append(new_row)
+        try:
+            for d in row.get('sensitive_data_list') :
+                new_row = {'file_name' : row['file_name']} | d
+                new_row['line_number'] += row['start_line']
+                df_leaks.append(new_row)
+        except Exception as e:
+            print(e)
+            pass
     return pd.DataFrame(df_leaks)
 
 def batch_load(iterator, batch_size):

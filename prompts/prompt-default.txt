@@ -7,12 +7,17 @@ Look for the following types of sensitive information:
 - Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AKIAXXXXXXXXXXXXXXX, azure_subscription_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Private SSH keys or passwords
 - exposed Database usernames, passwords, and connection strings
-- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
+- Exposed Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
 - Sensitive comments or TODO notes revealing vulnerabilities or private information
-- Email addresses and private communication
 
-Only report instances where the sensitive information is explicitly visible as strings and hard coded in the file.
+Only report instances where the value is explicitly visible as plain text and hard coded in the file. 
+Do not report instances where the value is properly hidden as a variable, secret or environment variable e.g. "{{ secrets.API_KEY }}" or "key = os.environ.get('HF_TOKEN')"
+
 The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
+
+Analyse whether the exposed data is real or a dummy placeholder example that needs to be replaced by a real key:
+- Dummy placeholder secrets tend to include keywords like pass, password, secret, dummy...
+- Dummy placeholder PII contains obviously fake data like 'John Doe' or 'user@example.com'
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
@@ -28,16 +33,16 @@ If the file contains leaks of sensitive information:
 
 2) For each instance of sensitive data found, provide the outputs in JSON format with the following keys:
 line_number: [Line number where the sensitive data is located]
-type_of_data: [Type of sensitive data]
+type_of_data: type_of_data: ['Exposed Secret' or 'PII']
 description: [Brief description of the sensitive data]
 sensitive_data : [the senstive data as it appears in the file]
+dummy: [True or False. If this looks like a fake dummy placeholder value put 'True', if this looks like a genuine leak put 'False']
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]
 file description : [brief decription of what the file is doing]
 sensitive data count: [the number of leaks found in the file.]
-sensitive data: description: [brief description of the sensitive data in the file. This should be empty if there is no sensitive data.]
-sensitive data: a list of the JSON objects containing the sensitive data created in step 2 above.
+sensitive data_list: a list of the JSON objects containing the sensitive data created in step 2 above.
 
 The output must follow this form exactly. A JSON object must always be returned. Do not give any other sort of output. 
 
@@ -46,21 +51,23 @@ The output must follow this form exactly. A JSON object must always be returned.
 <OUTPUT JSON>:
 
 {{ 
-    "file name": "config.env", 
-    "file description": "Environment configuration file.", 
-    "sensitive data count": 2, 
-    "sensitive data": [ 
+    "file_name": "config.env", 
+    "file_description": "Environment configuration file.", 
+    "sensitive_data_count": 2, 
+    "sensitive_data_list": [ 
         {{ 
             "line_number": 1, 
-            "type_of_data": "Hardcoded API KEY", 
-            "description": "AWS_API_Key", 
-            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
+            "type_of_data": "Exposed Secret", 
+            "description": "api key", 
+            "sensitive_data": "dummykey",
+            "dummy" : true
         }}, 
         {{ 
             "line_number": 2, 
-            "type_of_data": "Hardcoded API KEY", 
-            "description": "CLOUD_TOKEN", 
-            "sensitive_data": "awufjakjfaokaf789ghi" 
+            "type_of_data": "Exposed Secret", 
+            "description": "cloud token", 
+            "sensitive_data": "ak8459fai1239sruajikokok",
+            "dummy" : false
         }}] 
 }}
 

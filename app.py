@@ -15,6 +15,7 @@ from utils import (
     download_git_repo, list_branches, switch_branch, list_repo, load_readme_file, load_repo_files, 
     list_models, responses_to_df, summarise_responses, get_leaks_df, batch_load
 )
+from output_pydantic import ResponseOutput
 
 st.set_page_config(page_title="Repo Leak Scanner", layout="wide")
 st.title('Repo Leak Scanner 🪬')
@@ -37,7 +38,11 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             file_name = invoke_args['file_name']
             if len(invoke_args['file_content']) == 0:
                 invoke_args['file_content'] == 'EMPTY FILE.'
-            return doc, chain.invoke(invoke_args)
+            # replace "" in file with ' ' to allow json formatting
+            invoke_args['file_content'] = invoke_args['file_content'].replace("\"","'")
+            response = chain.invoke(invoke_args) 
+            response = response.replace("\\", "") # python can't handle these when json decoding
+            return doc, response
         
         num_batches = math.ceil(len(docs)/CONCURRENT_REQUEST_LIMIT)
         st.session_state["response_list"] = list()
@@ -56,7 +61,7 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             # print results as and when they come in            
             for idx, future in enumerate(concurrent.futures.as_completed(threads)):
                 response_progress_bar.progress((idx+1)/batch_size, text = f'Completed request {idx+1} of {batch_size}' )
-                json_parser, str_parser = JsonOutputParser(), StrOutputParser()
+                json_parser, str_parser = JsonOutputParser(pydantic_object=ResponseOutput), StrOutputParser()
                 with st.chat_message('AI'):
                     doc, response = future.result()
                     file_name, chunk_idx, start_line = doc['file_name'], doc['chunk_idx'], doc['start_line']
@@ -68,8 +73,13 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                         response = json_parser.invoke(response)
                         st.json(response)
                         st.session_state["response_list"].append(
-                            dict(file_name=file_name, chunk_idx=chunk_idx, start_line=start_line, response = response))
-                    except:
+                            dict(file_name = file_name, 
+                                 chunk_idx = chunk_idx,
+                                 total_chunks = total_chunks,
+                                 start_line = start_line, 
+                                 response = response))
+                    except Exception as e:
+                        st.write(e)
                         st.write(str_parser.invoke(response))
         batch_progress_bar.progress(100, f'Finished {num_batches} batches.')
 
@@ -81,7 +91,7 @@ def app_select_model():
     framework = st.selectbox('Framework', ['OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface', 'vLLM']).lower()
     
     if framework == 'ollama':
-        model = st.selectbox('Model', ['llama3', 'llama2', 'deepseek-coder'])
+        model = st.selectbox('Model', ['mistral', 'llama3', 'llama2', 'deepseek-coder'])
     
     elif framework == 'openai':
         model = st.selectbox('Model', ['gpt-3.5-turbo'])
@@ -215,23 +225,25 @@ with tab2:
             st.write(f"**{num_docs}** requests will be made. **{num_batches}** batch{'es' if num_batches>1 else''}")
             if st.button('Initiate Scan'):
                 prompt = get_current_prompt()                        
-                chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url)
+                chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url, 
+                                  parser = JsonOutputParser(pydantic_object=ResponseOutput))
                 app_get_multi_threaded_response(chain=chain, docs=st.session_state['docs'])
     else:
         st.write('**Use sidebar to select a repo**')
 
 with tab3:
+    # summarise app responses into a pair of dataframes
     if st.session_state['response_list']:
         responses_df = responses_to_df(st.session_state['response_list'])
         summary_df = summarise_responses(responses_df)
         leaks_df = get_leaks_df(responses_df)
-        st.metric('Leaks Found', summary_df['sensitive data count'].sum())
+        st.metric('Leaks Found', summary_df['sensitive_data_count'].sum())
         if st.toggle('Show Summary', True):
             st.dataframe(
                 summary_df, use_container_width=True,
                 column_config = {
-                "sensitive data count" : st.column_config.ProgressColumn(
-                    "sensitive data count", min_value = 0, max_value = 10,
+                "sensitive_data_count" : st.column_config.ProgressColumn(
+                    "sensitive_data_count", min_value = 0, max_value = 10,
                     format="%i")})
             
         if st.toggle('Show Leaks', True):
