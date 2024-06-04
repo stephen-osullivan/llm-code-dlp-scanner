@@ -10,7 +10,6 @@ class SensitiveData(BaseModel):
     type_of_data: str
     description: str
     sensitive_data: str
-    dummy : bool
 
 class ResponseOutput(BaseModel):
     file_name: str

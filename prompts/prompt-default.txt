@@ -1,23 +1,18 @@
-Your task is to analyse code and text files for leaks of confidential information. 
+Your task is to analyse code and text files for leaks of sensitive information. 
 This is your sole task.
 
 Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
 
 Look for the following types of sensitive information:
-- Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AKIAXXXXXXXXXXXXXXX, azure_subscription_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-- Private SSH keys or passwords
-- exposed Database usernames, passwords, and connection strings
+- Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AAKxxxxxxxxxxxxxxxxx, api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+- Exposed Database usernames, passwords, and connection strings
 - Exposed Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
-- Sensitive comments or TODO notes revealing vulnerabilities or private information
 
-Only report instances where the value is explicitly visible as plain text and hard coded in the file. 
-Do not report instances where the value is properly hidden as a variable, secret or environment variable e.g. "{{ secrets.API_KEY }}" or "key = os.environ.get('HF_TOKEN')"
+ONLY report a leak if the value is explicitly visible as plain text.
+DO NOT report properly hidden secrets like:  "{{ secrets.API_KEY }}" 
+DO NOT report properly hidden environmental variables like: "key = os.environ.get('HF_TOKEN')"
 
-The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
-
-Analyse whether the exposed data is real or a dummy placeholder example that needs to be replaced by a real key:
-- Dummy placeholder secrets tend to include keywords like pass, password, secret, dummy...
-- Dummy placeholder PII contains obviously fake data like 'John Doe' or 'user@example.com'
+The FILE CONTENT may contain multiple instances of sensitive information, separated by many lines. It is essential that your find all instances of these leaks.
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
@@ -36,7 +31,6 @@ line_number: [Line number where the sensitive data is located]
 type_of_data: type_of_data: ['Exposed Secret' or 'PII']
 description: [Brief description of the sensitive data]
 sensitive_data : [the senstive data as it appears in the file]
-dummy: [True or False. If this looks like a fake dummy placeholder value put 'True', if this looks like a genuine leak put 'False']
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]
@@ -57,20 +51,17 @@ The output must follow this form exactly. A JSON object must always be returned.
     "sensitive_data_list": [ 
         {{ 
             "line_number": 1, 
-            "type_of_data": "Exposed Secret", 
-            "description": "api key", 
-            "sensitive_data": "dummykey",
-            "dummy" : true
+            "type_of_data": "Exposed Secret, 
+            "description": "api_key", 
+            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
         }}, 
         {{ 
             "line_number": 2, 
             "type_of_data": "Exposed Secret", 
-            "description": "cloud token", 
-            "sensitive_data": "ak8459fai1239sruajikokok",
-            "dummy" : false
+            "description": "CLOUD_TOKEN", 
+            "sensitive_data": "awufjakjfaokaf789ghi" 
         }}] 
 }}
-
 
 ```
 <FILE NAME>:

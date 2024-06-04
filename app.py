@@ -41,7 +41,7 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
             # replace "" in file with ' ' to allow json formatting
             invoke_args['file_content'] = invoke_args['file_content'].replace("\"","'")
             response = chain.invoke(invoke_args) 
-            response = response.replace("\\", "") # python can't handle these when json decoding
+            response = StrOutputParser().invoke(response).replace("\\", "") # python can't handle these when json decoding
             return doc, response
         
         num_batches = math.ceil(len(docs)/CONCURRENT_REQUEST_LIMIT)
