@@ -1,4 +1,6 @@
 Your task is to analyse code and text files for leaks of sensitive information. 
+Sensitive information is data that, if leaked, could lead to unauthorized access, identity theft, financial loss, or other negative consequences.
+
 This is your sole task.
 
 Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
@@ -6,17 +8,19 @@ Analyse the file in the triple backticks (``` ```)  for leaks of sensitive infor
 Look for the following types of sensitive information:
 - Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AAKxxxxxxxxxxxxxxxxx, api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Exposed Database usernames, passwords, and connection strings
-- Exposed Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers
+- Exposed Personally Identifiable Information (PII) such as names, bank account information, email addresses, or phone numbers.
 
-ONLY report a leak if the value is explicitly visible as plain text.
-DO NOT report properly hidden secrets like:  "{{ secrets.API_KEY }}" 
-DO NOT report properly hidden environmental variables like: "key = os.environ.get('HF_TOKEN')"
+Ignore the following types of information. This information is not sensitive and must not appear in the JSON output:
+- Ignore properly hidden github secrets e.g. "${{ secrets.PIP_USERNAME }}"
+- Ignore properly hidden environmental variables e.g. "key = os.environ.get('HF_TOKEN')"
+- Ignore Variables and arguments to functions that only imply the existence of sensitive information at run time. e.g. 'def connect_to_db(db_username, db_key)
 
-The FILE CONTENT may contain multiple instances of sensitive information, separated by many lines. It is essential that your find all instances of these leaks.
+The file content may contain multiple instances of sensitive information, separated by many lines. It is essential that your find all instances of these leaks.
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
-Carefully, go through the file line by line and look for instances of senstiive information.
+Carefully, go through the file line by line and look for instances of sensitive information.
+If the information is sensitive, according to the above guidance, then add it to the output JSON.
 Then return the output exactly in the JSON format described below.
 Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
 
@@ -26,11 +30,11 @@ If the file contains leaks of sensitive information:
 
 1) Count the number of leaks found.
 
-2) For each instance of sensitive data found, provide the outputs in JSON format with the following keys:
+2) For each line of the file containing sensitive data, provide the outputs in JSON format with the following keys:
 line_number: [Line number where the sensitive data is located]
 type_of_data: type_of_data: ['Exposed Secret' or 'PII']
 description: [Brief description of the sensitive data]
-sensitive_data : [the senstive data as it appears in the file]
+sensitive_data : [the senstive data as it appears in the the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]

@@ -22,9 +22,7 @@ st.title('Repo Leak Scanner 🪬')
 
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 CONCURRENT_REQUEST_LIMIT = os.environ.get('CONCURRENT_REQUEST_LIMIT', 200)
-
-if 'key' not in st.session_state:
-    st.session_state['key'] = 'value'
+VALIDATE_RESPONSES = False
 
 ########################### APP FUNCTIONS #######################################
 def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
@@ -71,6 +69,15 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                     try:
                         # try to convert to json
                         response = json_parser.invoke(response)
+                        
+                        # check for hallucination
+                        sensitive_data_list = response['sensitive_data_list']
+                        for idx, data_element in enumerate(sensitive_data_list):
+                            if data_element['sensitive_data'] not in doc['file_content']:
+                                data_element['in_file'] = False
+                            else:
+                                data_element['in_file'] = True
+
                         st.json(response)
                         st.session_state["response_list"].append(
                             dict(file_name = file_name, 
@@ -78,10 +85,37 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                                  total_chunks = total_chunks,
                                  start_line = start_line, 
                                  response = response))
+                        
                     except Exception as e:
                         st.write(e)
                         st.write(str_parser.invoke(response))
         batch_progress_bar.progress(100, f'Finished {num_batches} batches.')
+
+def validate_responses(validation_chain):
+    """
+    loop through response and validate them one by one with a second llm call
+    """
+    validation_progress_bar = st.progress(0, f'Validating Responses')
+    def validate_response(file_name, data, response_idx, data_idx,):
+        validation = validation_chain.invoke({'file_name': file_name, 'data': data})
+        return response_idx, data_idx, validation
+    
+    response_list = st.session_state['response_list']
+    n = len(response_list)
+    if n > 0:
+        threads = []
+        n_threads = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:   
+            for response_idx, response in enumerate(response_list):
+                file_name = response['file_name']
+                response = response['response']
+                for data_idx, data in enumerate(response['sensitive_data_list']):
+                    threads.append(executor.submit(validate_response, file_name, data, response_idx, data_idx))
+                    n_threads += 1
+            for idx, future in enumerate(concurrent.futures.as_completed(threads)):
+                response_idx, data_idx, validation = future.result()
+                response_list[response_idx]['response']['sensitive_data_list'][data_idx]['is_leak'] = validation
+                validation_progress_bar.progress((idx+1)/n_threads, text = f'Completed validation {idx+1} of {n_threads}')
 
 def app_select_model():
     """
@@ -228,6 +262,12 @@ with tab2:
                 chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url, 
                                   parser = JsonOutputParser(pydantic_object=ResponseOutput))
                 app_get_multi_threaded_response(chain=chain, docs=st.session_state['docs'])
+                with open('prompts/prompt-validation.txt') as f:
+                    prompt_validation = f.read()  
+                validation_chain = get_chain(framework=framework, model=model, prompt=prompt_validation, endpoint_url=endpoint_url) | StrOutputParser()
+                if VALIDATE_RESPONSES:
+                    validate_responses(validation_chain=validation_chain)
+
     else:
         st.write('**Use sidebar to select a repo**')
 

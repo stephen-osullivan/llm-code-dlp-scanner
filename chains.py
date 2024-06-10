@@ -85,7 +85,6 @@ def get_prompt_template(prompt, parser=None):
         prompt_template = PromptTemplate.from_template(
             prompt,
             partial_variables={"format_instructions": parser.get_format_instructions()},
-        
         )
     else:
         prompt_template = ChatPromptTemplate.from_messages(
@@ -93,4 +92,3 @@ def get_prompt_template(prompt, parser=None):
         
         )
     return prompt_template
-

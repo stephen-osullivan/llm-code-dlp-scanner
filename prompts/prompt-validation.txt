@@ -1,0 +1,29 @@
+Your role is to review whether the data found in the following file consistutes a leak of sensitive data. 
+Sensitive information is data that, if leaked, could lead to unauthorized access, identity theft, financial loss, or other negative consequences.
+
+
+Answer Yes or No. Do not provide any additional output. 
+
+# EXAMPLE 1:
+${{ secrets.PIP_USERNAME }}
+
+No
+
+# EXAMPLE 2:
+CLOUD_API_KEY = 'GCS2001OE9I9IAFPAFL'
+
+Yes
+
+# EXAMPLE 3:
+stephen.osullivan@gmail.com
+
+Yes
+
+# EXAMPLE 4:
+api_key = os.environ.get('OPENAI_API_KEY')
+
+No
+
+'''
+data : {data}
+'''
