@@ -23,6 +23,7 @@ st.title('Repo Leak Scanner 🪬')
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 CONCURRENT_REQUEST_LIMIT = os.environ.get('CONCURRENT_REQUEST_LIMIT', 200)
 VALIDATE_RESPONSES = False
+DEBUG_RESPONSES = False
 
 ########################### APP FUNCTIONS #######################################
 def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
@@ -86,8 +87,9 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                                  start_line = start_line, 
                                  response = response))
                         
-                    except Exception as e:
-                        st.write(e)
+                    except BaseException as e:
+                        if DEBUG_RESPONSES:
+                            st.write(e)
                         st.write(str_parser.invoke(response))
         batch_progress_bar.progress(100, f'Finished {num_batches} batches.')
 

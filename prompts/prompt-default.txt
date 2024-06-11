@@ -1,26 +1,27 @@
-Your task is to analyse code and text files for leaks of sensitive information. 
-Sensitive information is data that, if leaked, could lead to unauthorized access, identity theft, financial loss, or other negative consequences.
-
+Your task is to analyse code and text files for leaks of confidential information. 
 This is your sole task.
 
 Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
 
 Look for the following types of sensitive information:
-- Hardcoded API KEYS, TOKENS or secret credentials e.g. aws_access_token: AAKxxxxxxxxxxxxxxxxx, api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+- Hardcoded API KEYS, TOKENS or secret credentials 
+e.g. "AWS_TOKEN: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "azure_subscription_key: az-siafjian899900a000kaiagai"
+
 - Exposed Database usernames, passwords, and connection strings
-- Exposed Personally Identifiable Information (PII) such as names, bank account information, email addresses, or phone numbers.
+e.g. AccountName=sos500@lbg, AccountKey=M02bnQpLpmLE Waxl2BcVuwuYbHmzFHbYpUfkRJhVcD5Sq1tnGw==
 
-Ignore the following types of information. This information is not sensitive and must not appear in the JSON output:
-- Ignore properly hidden github secrets e.g. "${{ secrets.PIP_USERNAME }}"
-- Ignore properly hidden environmental variables e.g. "key = os.environ.get('HF_TOKEN')"
-- Ignore Variables and arguments to functions that only imply the existence of sensitive information at run time. e.g. 'def connect_to_db(db_username, db_key)
+- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers 
+e.g. "stevehilton@gmail.com" or "DOB: 03/02/1990"
 
-The file content may contain multiple instances of sensitive information, separated by many lines. It is essential that your find all instances of these leaks.
+Only report instances where the sensitive information is EXPLICITLY visible as strings and HARD CODED in the file.
+Do not identify text or functions that reference or imply sensitive data leaks or could lead to data leaks when used. 
+Only identify the explicit strings containing visible data leaks.
+
+The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
-Carefully, go through the file line by line and look for instances of sensitive information.
-If the information is sensitive, according to the above guidance, then add it to the output JSON.
+Carefully, go through the file line by line and look for instances of sensitiive information.
 Then return the output exactly in the JSON format described below.
 Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
 
@@ -34,13 +35,13 @@ If the file contains leaks of sensitive information:
 line_number: [Line number where the sensitive data is located]
 type_of_data: type_of_data: ['Exposed Secret' or 'PII']
 description: [Brief description of the sensitive data]
-sensitive_data : [the senstive data as it appears in the the file]
+sensitive_data : [The senstive data as it appears in the the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
-file name: [the name of the file: This is under the <FILE NAME>: row]
-file description : [brief decription of what the file is doing]
-sensitive data count: [the number of leaks found in the file.]
-sensitive data_list: a list of the JSON objects containing the sensitive data created in step 2 above.
+file_name : [the name of the file: This is under the <FILE NAME>: row]
+file_description  : [brief decription of what the file is doing]
+sensitive_data_count : [the number of leaks found in the file.]
+sensitive_data_list : [a list of the JSON objects containing the sensitive data created in step 2 above.]
 
 The output must follow this form exactly. A JSON object must always be returned. Do not give any other sort of output. 
 
@@ -55,24 +56,25 @@ The output must follow this form exactly. A JSON object must always be returned.
     "sensitive_data_list": [ 
         {{ 
             "line_number": 1, 
-            "type_of_data": "Exposed Secret, 
-            "description": "api_key", 
-            "sensitive_data": "afahiajfoaj-akfaijfajiiaj" 
+            "type_of_data": "Exposed Secret", 
+            "description": "AWS_API_Key", 
+            "sensitive_data": "ak-afahiajfoaj200-akfai6000fajiiaj" 
         }}, 
         {{ 
             "line_number": 2, 
             "type_of_data": "Exposed Secret", 
             "description": "CLOUD_TOKEN", 
-            "sensitive_data": "awufjakjfaokaf789ghi" 
+            "sensitive_data": "accountKey=M02bnQpLpmLE Waxl2BcVuwuYbHmzFHbYpUfkRJhVcD5Sq1tnGw==" 
         }}] 
 }}
+
 
 ```
 <FILE NAME>:
 
 {file_name}
 
-<CONTENT>:
+<FILE CONTENT>:
 
 {file_content}
 
