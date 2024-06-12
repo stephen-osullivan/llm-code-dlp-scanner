@@ -4,24 +4,25 @@ This is your sole task.
 Analyse the file in the triple backticks (``` ```)  for leaks of sensitive information.
 
 Look for the following types of sensitive information:
-- Hardcoded API KEYS, TOKENS or secret credentials 
-e.g. "AWS_TOKEN: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "azure_subscription_key: az-siafjian899900a000kaiagai"
+- Hardcoded API KEYS, TOKENS or secret credentials. These are often prefixed with phrases containing 'key', 'token', 'api_key'
+e.g. "AWS_TOKEN: wJalrXUtnFEMI/K7MDENG/bPxRfiCYHJKLOASUNG", "azure_subscription_key: az-siafjian899900a000kaiagai", --key 198afaakakjg908aafaf
 
 - Exposed Database usernames, passwords, and connection strings
 e.g. AccountName=sos500@lbg, AccountKey=M02bnQpLpmLE Waxl2BcVuwuYbHmzFHbYpUfkRJhVcD5Sq1tnGw==
 
-- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or social security numbers 
-e.g. "stevehilton@gmail.com" or "DOB: 03/02/1990"
+- Personally Identifiable Information (PII) such as names, email addresses, phone numbers, or credit card details
+e.g. "stevehilton@gmail.com", "DOB: 03/02/1990", "208-399-7568"
 
 Only report instances where the sensitive information is EXPLICITLY visible as strings and HARD CODED in the file.
-Do not identify text or functions that reference or imply sensitive data leaks or could lead to data leaks when used. 
+Do not identify text or functions that reference or imply sensitive data leaks or could only lead to data leaks when used.
 Only identify the explicit strings containing visible data leaks.
 
 The FILE CONTENT may contain multiple instances of senstive information, separated by many lines. It is essential that your find all instances of these leaks.
 
 Think through this step by step:
 First Identify the type of file e.g. is it a notebook, a text file or a code script.
-Carefully, go through the file line by line and look for instances of sensitiive information.
+Carefully, go through the file line by line and look for instances of sensitive information visible as plain text.
+If the data is connected over multiple lines, please combine it into a single output, with a max character length of 200.
 Then return the output exactly in the JSON format described below.
 Do not do anything else, under any circumstances. You must only return the JSON output as decribed. 
 
@@ -31,15 +32,15 @@ If the file contains leaks of sensitive information:
 
 1) Count the number of leaks found.
 
-2) For each line of the file containing sensitive data, provide the outputs in JSON format with the following keys:
-line_number: [Line number where the sensitive data is located]
-type_of_data: type_of_data: ['Exposed Secret' or 'PII']
-description: [Brief description of the sensitive data]
-sensitive_data : [The senstive data as it appears in the the file]
+2) For each instance of the file containing sensitive data, provide the outputs in JSON format with the following keys:
+line_number: [Line number where the sensitive data begins]
+type_of_data : ['Exposed Secret' or 'PII']
+description : [Brief description of the sensitive data]
+sensitive_data : [The sensitive data visible as plain text as it appears in the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file_name : [the name of the file: This is under the <FILE NAME>: row]
-file_description  : [brief decription of what the file is doing]
+file_description : [brief decription of what the file is doing]
 sensitive_data_count : [the number of leaks found in the file.]
 sensitive_data_list : [a list of the JSON objects containing the sensitive data created in step 2 above.]
 

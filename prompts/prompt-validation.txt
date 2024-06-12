@@ -1,29 +1,50 @@
-Your role is to review whether the data found in the following file consistutes a leak of sensitive data. 
-Sensitive information is data that, if leaked, could lead to unauthorized access, identity theft, financial loss, or other negative consequences.
 
+Your role is to review the following data to determine whether it constitutes a real sensitive data leak.
 
-Answer Yes or No. Do not provide any additional output. 
+The types of sensitive data we are looking for are PII (Personally Identifiable Information) or leaked api keys, tokens, credentials and passswords.
 
-# EXAMPLE 1:
-${{ secrets.PIP_USERNAME }}
+Analyse the data surrounded by triple backticks (''') and response with one of the following options.
 
-No
+Only answer with one of these options:
+- "Yes" if there is a genuine plain text vible secret, password, api key or credentials.
+- "Yes" if the data contains a specific instance of plain text visible PII that could be used to help identify a specific individual.
+- "No", if is just a placeholder string and needs to be replaced by a real key, this includes keywords like dummy, temp, password, secret...
+- "No", if there is obviously fake PII like fake email addresses: e.g. janesmith@example.com, john.raines@dummy.com
+- "No", if the data contains only references to secrets, keys or PII data and not the actual data itself.
+- "No", if the data contains no plain text that could be considered sensitive data.
 
-# EXAMPLE 2:
-CLOUD_API_KEY = 'GCS2001OE9I9IAFPAFL'
+Follow your answer with an explanation one or two sentences long.
 
-Yes
+### EXAMPLE 1
 
-# EXAMPLE 3:
-stephen.osullivan@gmail.com
+email address of james.renolds : james.renolds@example.com" 
 
-Yes
+No: The domain @example.com looks like a fake email domain.
 
-# EXAMPLE 4:
-api_key = os.environ.get('OPENAI_API_KEY')
+### EXAMPLE 2:
 
-No
+"phone number" : "phone number"
+
+No: There is just a string saying "phone number" and no actual phone number or PII in the data.
+
+### EXAMPLE 3:
+
+"api-key" : "81ad28-as8faf-838aflk-kij290"
+
+Yes: This is a high entropy string and looks like a real api key.
+
+### EXAMPLE 4:
+
+"Sam Smith's DOB" : "22/01/1987"
+
+Yes: This could be Sam Smith's actual date of birth
+
+### EXAMPLE 4:
+
+"CLOUD TOKEN" : "${{ secrets.CLOUD_TOKEN }}"
+
+No: The cloud token itself is not visible and is properly hidden behind a secret variable.
 
 '''
-data : {data}
+{data}
 '''

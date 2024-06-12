@@ -22,7 +22,7 @@ st.title('Repo Leak Scanner 🪬')
 
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 CONCURRENT_REQUEST_LIMIT = os.environ.get('CONCURRENT_REQUEST_LIMIT', 200)
-VALIDATE_RESPONSES = False
+VALIDATE_RESPONSES = True
 DEBUG_RESPONSES = False
 
 ########################### APP FUNCTIONS #######################################
@@ -74,7 +74,7 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                         # check for hallucination
                         sensitive_data_list = response['sensitive_data_list']
                         for idx, data_element in enumerate(sensitive_data_list):
-                            if data_element['sensitive_data'] not in doc['file_content']:
+                            if data_element['sensitive_data'] not in doc['file_content'].replace("\"","'"):
                                 data_element['in_file'] = False
                             else:
                                 data_element['in_file'] = True
@@ -99,7 +99,7 @@ def validate_responses(validation_chain):
     """
     validation_progress_bar = st.progress(0, f'Validating Responses')
     def validate_response(file_name, data, response_idx, data_idx,):
-        validation = validation_chain.invoke({'file_name': file_name, 'data': data})
+        validation = validation_chain.invoke({'data': data})
         return response_idx, data_idx, validation
     
     response_list = st.session_state['response_list']
@@ -112,8 +112,19 @@ def validate_responses(validation_chain):
                 file_name = response['file_name']
                 response = response['response']
                 for data_idx, data in enumerate(response['sensitive_data_list']):
-                    threads.append(executor.submit(validate_response, file_name, data, response_idx, data_idx))
-                    n_threads += 1
+                    try:
+                        data =  data['description'] + " : " + data['sensitive_data']
+                        threads.append(
+                        executor.submit(
+                            validate_response, 
+                            file_name,
+                            data,
+                            response_idx, 
+                            data_idx))    
+                   
+                        n_threads += 1
+                    except Exception as e:
+                        pass
             for idx, future in enumerate(concurrent.futures.as_completed(threads)):
                 response_idx, data_idx, validation = future.result()
                 response_list[response_idx]['response']['sensitive_data_list'][data_idx]['is_leak'] = validation
@@ -279,7 +290,7 @@ with tab3:
         responses_df = responses_to_df(st.session_state['response_list'])
         summary_df = summarise_responses(responses_df)
         leaks_df = get_leaks_df(responses_df)
-        st.metric('Leaks Found', summary_df['sensitive_data_count'].sum())
+        st.metric('Possible Leaks Found', summary_df['sensitive_data_count'].sum())
         if st.toggle('Show Summary', True):
             st.dataframe(
                 summary_df, use_container_width=True,
@@ -288,7 +299,7 @@ with tab3:
                     "sensitive_data_count", min_value = 0, max_value = 10,
                     format="%i")})
             
-        if st.toggle('Show Leaks', True):
+        if st.toggle('Show Possible Leaks', True):
             st.dataframe(leaks_df, use_container_width=True)
 
 with tab4:
