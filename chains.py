@@ -51,8 +51,8 @@ def get_openai_model(model='gpt-3.5-turbo', endpoint_url = 'https://api.openai.c
         llm = ChatOpenAI(
             model=model, 
             temperature=0,
-            max_tokens = 2048,
-            openai_api_base=endpoint_url,
+            max_tokens = 4096,
+            openai_api_base=endpoint_url
             )
     else:
         raise Exception('OPENAI_API_KEY NOT PROVIDED')
@@ -77,7 +77,9 @@ def get_vllm_model(model, endpoint_url):
         openai_api_base=endpoint_url,
         model_name=model, 
         temperature=0,
-        max_tokens = 4096)
+        max_tokens = 1024,
+        model_kwargs=dict(stop=['<|im_end|>', '<|im_start|>'])
+        )
     return llm
 
 
@@ -90,6 +92,5 @@ def get_prompt_template(prompt, parser=None):
     else:
         prompt_template = ChatPromptTemplate.from_messages(
             [('human', prompt)],
-        
         )
     return prompt_template

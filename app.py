@@ -23,7 +23,7 @@ st.title('Repo Leak Scanner 🪬')
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 CONCURRENT_REQUEST_LIMIT = os.environ.get('CONCURRENT_REQUEST_LIMIT', 200)
 VALIDATE_RESPONSES = True
-DEBUG_RESPONSES = False
+DEBUG_RESPONSES = True
 
 ########################### APP FUNCTIONS #######################################
 def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
@@ -70,7 +70,10 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                     try:
                         # try to convert to json
                         response = json_parser.invoke(response)
-                        
+                        if 'sensitive_data_list' not in response:
+                            response['sensitive_data_list'] = []
+                        if 'sensitive_data_count' not in response:
+                            response['sensitive_data_count'] = 0
                         # check for hallucination
                         sensitive_data_list = response['sensitive_data_list']
                         for idx, data_element in enumerate(sensitive_data_list):
@@ -90,7 +93,10 @@ def app_get_multi_threaded_response(chain, docs:list, max_workers=10) -> None:
                     except BaseException as e:
                         if DEBUG_RESPONSES:
                             st.write(e)
-                        st.write(str_parser.invoke(response))
+                        try:
+                            st.write(str_parser.invoke(response))
+                        except Exception:
+                            st.write(response)
         batch_progress_bar.progress(100, f'Finished {num_batches} batches.')
 
 def validate_responses(validation_chain):
@@ -272,7 +278,7 @@ with tab2:
             st.write(f"**{num_docs}** requests will be made. **{num_batches}** batch{'es' if num_batches>1 else''}")
             if st.button('Initiate Scan'):
                 prompt = get_current_prompt()                        
-                chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url, 
+                chain = get_chain(framework=framework, model=model, prompt=prompt, endpoint_url= endpoint_url,
                                   parser = JsonOutputParser(pydantic_object=ResponseOutput))
                 app_get_multi_threaded_response(chain=chain, docs=st.session_state['docs'])
                 with open('prompts/prompt-validation.txt') as f:
