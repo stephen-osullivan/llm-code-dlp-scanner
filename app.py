@@ -135,7 +135,7 @@ def app_select_model():
     select a frame work and thena  model from those available
     """
     endpoint_url=None
-    framework = st.selectbox('Framework', ['OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface', 'vLLM']).lower()
+    framework = st.selectbox('Framework', ['vLLM', 'OpenAI-Compatible', 'OpenAI', 'Ollama', 'Huggingface']).lower()
     
     if framework == 'ollama':
         model = st.selectbox('Model', ['mistral', 'llama3', 'llama2', 'deepseek-coder'])
@@ -151,7 +151,7 @@ def app_select_model():
     elif framework == "vllm":
         default_url =  os.environ.get('DEFAULT_ENDPOINT_URL', 'http://localhost:8000/v1') # 8000 is vllm
         endpoint_url = st.text_input('Enter endpoint URL', value = default_url)
-        model = st.text_input('Model', "/models/TheBloke/Mistral-7B-Instruct-v0.2-AWQ")
+        model = st.selectbox('Model', list_models(endpoint_url))
 
     elif framework == 'huggingface':
         model = st.selectbox('Model', ["mistralai/Mistral-7B-Instruct-v0.2", "google/gemma-1.1-7b-it", "meta-llama/Meta-Llama-3-8B-Instruct"])
