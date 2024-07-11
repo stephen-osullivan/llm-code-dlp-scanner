@@ -133,7 +133,7 @@ def validate_responses(validation_chain):
                         pass
             for idx, future in enumerate(concurrent.futures.as_completed(threads)):
                 response_idx, data_idx, validation = future.result()
-                response_list[response_idx]['response']['sensitive_data_list'][data_idx]['is_leak'] = validation
+                response_list[response_idx]['response']['sensitive_data_list'][data_idx]['is_leak'] = validation.split(".")[0]
                 validation_progress_bar.progress((idx+1)/n_threads, text = f'Completed validation {idx+1} of {n_threads}')
 
 def app_select_model():
@@ -168,13 +168,16 @@ def app_get_repo():
     """
     download a repo if necessary or point to a local one
     """
-    repo_type = st.selectbox('Repo Type', ['Local', 'Online'])
+    repo_type = st.selectbox('Repo Type', ['Online', 'Local'])
     if repo_type == 'Online':
+        git_pat = st.text_input('Please enter a github pat if necessary', type='password')
         repo_url = st.text_input('Please enter a github repo url: https://github.com/user/repo.git')
-        if repo_url:
+        if repo_url:    
+            if git_pat.strip() == "":
+                git_pat = None
             download_repo = st.button('Download Repo')
             if download_repo:
-                local_repo_path = download_git_repo(repo_url)
+                local_repo_path = download_git_repo(repo_url, git_pat=git_pat)
                 st.toast('Download Successful.', icon='✅')
                 st.session_state['local_repo_path'] = local_repo_path
                 st.session_state['docs']=None
@@ -227,14 +230,14 @@ with st.sidebar:
     # side bar options
     framework, model, endpoint_url = app_select_model()
     app_get_repo()
-    if st.session_state['local_repo_path']:
+    if os.path.isdir(st.session_state['local_repo_path']):
         branch_name = st.selectbox('Switch Branch', list_branches(st.session_state['local_repo_path']))
         if st.button('Switch'):
             switch_branch(st.session_state['local_repo_path'], branch_name)
         
 ### Main section
 
-if st.session_state['local_repo_path']:
+if os.path.isdir(st.session_state['local_repo_path']):
     # Display Repo Metrics in header
     files = list_repo(st.session_state['local_repo_path'], depth=-1, files_only=True)
     num_files = len(files)
@@ -251,7 +254,7 @@ if st.session_state['local_repo_path']:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Repo', 'Scan Repo', 'Scan Results', 'Change Prompt', 'Clear Cache'])
 with tab1:
     # View Repo Readme or Files
-    if st.session_state['local_repo_path']:
+    if os.path.isdir(st.session_state['local_repo_path']):
         col1, col2 = st.columns([2,1])
         with col1:
             if st.toggle('Show README.md'):
@@ -329,14 +332,21 @@ with tab4:
     
 with tab5:
     repos = []
+    
+    # list repos on the screen
     users = os.listdir(REPO_SAVE_DIR)
+    users = [user for user in users if os.path.isdir(os.path.join(REPO_SAVE_DIR, user))]
     for user in users:
         # loop over all users in the folder
         user_path = os.path.join(REPO_SAVE_DIR, user)
         if os.path.isdir(user_path):
             user_repos = os.listdir(user_path)
             repos.extend([os.path.join(user, r) for r in user_repos if os.path.isdir(os.path.join(user_path, r))])
+    
     st.write(repos)
+
     if st.button('Clear Downloaded Repos'):
-        for r in repos:
-            shutil.rmtree(os.path.join(REPO_SAVE_DIR, r))
+        if len(users) > 0:
+            while users:
+                shutil.rmtree(os.path.join(REPO_SAVE_DIR, users.pop()))
+        repos=[]

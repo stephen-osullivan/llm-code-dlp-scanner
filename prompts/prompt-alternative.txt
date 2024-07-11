@@ -30,7 +30,7 @@ If the file contains leaks of sensitive information:
 line_number: [Line number where the sensitive data is located]
 type_of_data: [Type of sensitive data]
 description: [Brief description of the sensitive data]
-sensitive_data : [the senstive data as it appears in the line of the file]
+sensitive_data : [the senstive data as it appears in the of the file]
 
 3) Collect all instances of sensitive data found in one larger JSON object with the following metadata:
 file name: [the name of the file: This is under the <FILE NAME>: row]

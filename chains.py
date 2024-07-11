@@ -66,7 +66,9 @@ def get_hugginface_model(model="mistralai/Mistral-7B-Instruct-v0.2"):
             temperature=0.01, 
             top_k=1,
             max_new_tokens=1024,
-            model_kwargs=dict(stop_token=['<|eot_id|>'], max_length=1024, token=token))
+            model_kwargs=dict(
+                stop_token=['<|im_end|>', '<|im_start|>','</s>', "[INST]", "Human:"],
+                max_length=1024, token=token))
     else:
         raise Exception('HUGGINGFACEHUB_API_TOKEN NOT PROVIDED.')
     return llm
@@ -78,7 +80,7 @@ def get_vllm_model(model, endpoint_url):
         model_name=model, 
         temperature=0,
         max_tokens = 1024,
-        model_kwargs=dict(stop=['<|im_end|>', '<|im_start|>'])
+        model_kwargs=dict(stop=['<|im_end|>', '<|im_start|>','</s>', "[INST]", "Human:"])
         )
     return llm
 

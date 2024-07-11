@@ -14,20 +14,27 @@ MAX_FILE_SIZE = int(os.environ.get('MAX_FILE_SIZE', 20*1024*1024)) # 20 MB
 MAX_DOC_CHARS = int(os.environ.get('MAX_DOC_CHARS', 15_000)) # 15_000 characters max doc size before chunking
 REPO_SAVE_DIR = os.environ.get('REPO_SAVE_DIR', 'temp/repos')
 
-def download_git_repo(url: str) -> str:
+def download_git_repo(repo_url: str, git_pat : str = None) -> str:
     """
     download a repo using git python and saves it in REPO_SAVE_DIR
     """
 
-    repo_local_path = os.path.join(REPO_SAVE_DIR, '/'.join(url.split('/')[-2:]).split('.git')[0])
-            
-    if os.path.exists(repo_local_path):
+    destination_path = os.path.join(REPO_SAVE_DIR, '/'.join(repo_url.split('/')[-2:]).split('.git')[0])
+    if os.path.exists(destination_path):
         # Remove the existing directory and its contents
-        shutil.rmtree(repo_local_path)
+        print('Deleting existing repository')
+        shutil.rmtree(destination_path)
 
+    # use pat if provided:
+    if git_pat:
+        repo_url = repo_url.replace('https://', f'https://{git_pat}@')
     # Clone the repository
-    Repo.clone_from(url, repo_local_path)
-    return repo_local_path
+    try:
+        Repo.clone_from(repo_url, destination_path)
+        print(f"Repository cloned successfully to {destination_path}")
+    except Exception as e:
+        print(f"Error cloning repository: {e}")
+    return destination_path
 
 def list_branches(repo_local_path:str) -> list:
     """
@@ -144,6 +151,12 @@ def list_models(endpoint_url):
     except Exception as e:
         print(e)
         return ['Failed to connect to host.']
+
+def validate_classifications(response_list):
+    """
+    feed the positive response by one by one back into the LLM to get confirmation
+    """
+
 
 @st.cache_data
 def responses_to_df(response_list):
