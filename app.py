@@ -225,19 +225,21 @@ for key in session_state_vars:
     if key not in st.session_state:
         st.session_state[key] = None
 
+local_repo_found = st.session_state['local_repo_path'] and os.path.isdir(st.session_state['local_repo_path'])
+
 ### SIDE BAR
 with st.sidebar:
     # side bar options
     framework, model, endpoint_url = app_select_model()
     app_get_repo()
-    if os.path.isdir(st.session_state['local_repo_path']):
+    if local_repo_found:
         branch_name = st.selectbox('Switch Branch', list_branches(st.session_state['local_repo_path']))
         if st.button('Switch'):
             switch_branch(st.session_state['local_repo_path'], branch_name)
         
 ### Main section
 
-if os.path.isdir(st.session_state['local_repo_path']):
+if local_repo_found:
     # Display Repo Metrics in header
     files = list_repo(st.session_state['local_repo_path'], depth=-1, files_only=True)
     num_files = len(files)
@@ -254,7 +256,7 @@ if os.path.isdir(st.session_state['local_repo_path']):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Repo', 'Scan Repo', 'Scan Results', 'Change Prompt', 'Clear Cache'])
 with tab1:
     # View Repo Readme or Files
-    if os.path.isdir(st.session_state['local_repo_path']):
+    if local_repo_found:
         col1, col2 = st.columns([2,1])
         with col1:
             if st.toggle('Show README.md'):
